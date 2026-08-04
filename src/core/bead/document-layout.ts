@@ -36,6 +36,8 @@ export interface BeadLegendPageLayout {
   pageWidth: number
   pageHeight: number
   entries: PaletteEntry[]
+  pageNumber: number
+  totalPages: number
 }
 
 export interface BeadSvgLayout {
@@ -135,9 +137,13 @@ export function createBeadDocumentLayout(result: PixelResult, palette: PaletteEn
     legendColumns,
   }
 
+  const pdfLegendPages: BeadLegendPageLayout[] = []
+  for (let offset = 0; offset < palette.length; offset += 64) {
+    pdfLegendPages.push({ pageWidth, pageHeight, entries: palette.slice(offset, offset + 64), pageNumber: pdfLegendPages.length + 1, totalPages: Math.ceil(palette.length / 64) })
+  }
   return {
     pdfPages,
-    pdfLegendPages: palette.length > 0 ? [{ pageWidth, pageHeight, entries: palette.slice(0, 64) }] : [],
+    pdfLegendPages,
     svgOverview,
   }
 }

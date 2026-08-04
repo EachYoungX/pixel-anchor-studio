@@ -27,4 +27,13 @@ describe('createBeadDocumentLayout', () => {
       expect(page.gridY + page.gridHeight).toBeLessThanOrEqual(page.pageHeight)
     }
   })
+
+  it('creates additional legend pages instead of dropping colors', () => {
+    const moreColors = [...palette, ...Array.from({ length: 6 }, (_, index) => ({ code: `C${index + 65}`, hex: '#8b4a43', rgba: [139, 74, 67, 255] as [number, number, number, number], count: index + 1 }))]
+    const layout = createBeadDocumentLayout(result, moreColors, settings)
+
+    expect(layout.pdfLegendPages).toHaveLength(2)
+    expect(layout.pdfLegendPages[0].entries).toHaveLength(64)
+    expect(layout.pdfLegendPages[1].entries).toHaveLength(6)
+  })
 })
