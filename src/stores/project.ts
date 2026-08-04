@@ -189,14 +189,22 @@ export const useProjectStore = defineStore('project', () => {
     Object.assign(anchor, clampRect(snapRectToSourcePixels({ ...next, width: square, height: square }), source.value.width, source.value.height, 4))
   }
 
-  function resetCrop(): void {
+  function useCustomCrop(): void {
     if (!source.value) return
-    cropSettings.mode = 'full'
+    cropSettings.mode = 'custom'
+    editTarget.value = 'crop'
   }
 
-  function centerSquareCrop(): void {
+  function useFullCrop(): void {
+    if (!source.value) return
+    cropSettings.mode = 'full'
+    editTarget.value = 'crop'
+  }
+
+  function useCenterSquareCrop(): void {
     if (!source.value) return
     cropSettings.mode = 'center-square'
+    editTarget.value = 'crop'
   }
 
   function resetGridPhase(): void {
@@ -462,8 +470,9 @@ export const useProjectStore = defineStore('project', () => {
     importImage,
     updateCrop,
     updateAnchor,
-    resetCrop,
-    centerSquareCrop,
+    useCustomCrop,
+    useFullCrop,
+    useCenterSquareCrop,
     resetGridPhase,
     process,
     applyTool,
