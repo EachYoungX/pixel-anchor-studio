@@ -56,7 +56,7 @@ async function generate(): Promise<void> {
           class="button button-small"
           :class="{ 'button-active': store.scale.mode === 'direct' }"
           type="button"
-          @click="store.scale.mode = 'direct'"
+          @click="store.scale.mode = 'direct'; store.scale.directAxis = 'longSide'"
         >指定输出尺寸</button>
         <button
           class="button button-small"
@@ -74,21 +74,13 @@ async function generate(): Promise<void> {
 
       <template v-if="store.scale.mode === 'direct'">
         <div class="field">
-          <label for="direct-axis">尺寸依据</label>
-          <select id="direct-axis" v-model="store.scale.directAxis" class="select">
-            <option value="longSide">指定长边</option>
-            <option value="width">指定宽度</option>
-            <option value="height">指定高度</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="direct-value">目标像素</label>
+          <label for="direct-value">长边像素数</label>
           <div class="range-row">
             <input id="direct-value" v-model.number="store.scale.directValue" class="range" type="range" min="8" max="256" step="1" />
             <input v-model.number="store.scale.directValue" class="input" type="number" min="1" max="256" />
           </div>
         </div>
-        <p class="help">另一边依据裁剪比例自动计算，不进行非等比拉伸。</p>
+        <p class="help">锁定原图比例，短边会依据当前裁剪比例自动计算，不进行非等比拉伸。</p>
       </template>
 
       <template v-else-if="store.scale.mode === 'anchor'">
