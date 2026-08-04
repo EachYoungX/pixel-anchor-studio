@@ -1,5 +1,6 @@
 import { computed, onBeforeUnmount, onMounted, ref, type Ref } from 'vue'
 import type { Point } from '@/core/viewport/viewport-math'
+import { shouldCaptureZoomWheel, wheelDirection } from '@/core/viewport/gesture-policy'
 import type { ViewportController } from '@/composables/useViewportController'
 
 export interface CanvasGestureOptions {
@@ -75,10 +76,10 @@ export function useCanvasGestures(options: CanvasGestureOptions) {
   }
 
   function onWheel(event: WheelEvent): void {
-    if (!(event.ctrlKey || event.metaKey)) return
+    if (!shouldCaptureZoomWheel(event)) return
     event.preventDefault()
     const point = options.getLocalPoint(event)
-    options.viewport.zoomByStep(point.x, point.y, event.deltaY < 0 ? 1 : -1)
+    options.viewport.zoomByStep(point.x, point.y, wheelDirection(event.deltaY))
   }
 
   function onKeyDown(event: KeyboardEvent): void {

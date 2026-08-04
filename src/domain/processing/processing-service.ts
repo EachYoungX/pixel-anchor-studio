@@ -1,6 +1,8 @@
 import { releaseProcessingSource, runProcessing } from '@/core/worker-client'
 import type { ProcessRequest, ProcessResponse } from '@/types/project'
 
+export type ProcessingRunner = (request: ProcessRequest, sourceId: string) => Promise<ProcessResponse>
+
 export class StaleProcessingRequestError extends Error {
   constructor() {
     super('处理结果已过时')
@@ -11,9 +13,11 @@ export class StaleProcessingRequestError extends Error {
 export class ProcessingService {
   private generation = 0
 
+  constructor(private readonly runner: ProcessingRunner = runProcessing) {}
+
   async process(request: ProcessRequest, sourceId: string): Promise<ProcessResponse> {
     const generation = ++this.generation
-    const response = await runProcessing(request, sourceId)
+    const response = await this.runner(request, sourceId)
     if (generation !== this.generation) throw new StaleProcessingRequestError()
     return response
   }

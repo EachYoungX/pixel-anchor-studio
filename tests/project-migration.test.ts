@@ -55,4 +55,14 @@ describe('migrateProject', () => {
     expect(missing.scale.directLongSide).toBe(32)
     expect(explicit.scale.directLongSide).toBe(128)
   })
+
+  it('converts a legacy data URL source to the v4 compressed source shape', () => {
+    const project = migrateProject({
+      ...baseProject,
+      version: 3,
+      source: { name: 'sample.jpg', dataUrl: 'data:image/jpeg;base64,QUJD', width: 3, height: 2 },
+    })
+
+    expect(project.source).toEqual({ name: 'sample.jpg', mime: 'image/jpeg', width: 3, height: 2, dataBase64: 'QUJD' })
+  })
 })

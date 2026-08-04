@@ -8,6 +8,7 @@ import { base64ToBytes, bytesToBase64 } from '@/core/export/project'
 import { ProcessingService } from '@/domain/processing/processing-service'
 import { SourceSession } from '@/domain/source/source-session'
 import type { DirtyBounds } from '@/domain/editor/pixel-operations'
+import { EditorSession } from '@/domain/editor/editor-session'
 import { defaultBead, defaultProcessing, defaultScale, defaultSnapSettings } from '@/domain/project/defaults'
 import type {
   BeadSettings,
@@ -84,12 +85,7 @@ export const useProjectStore = defineStore('project', () => {
   let generatedResultRevision = 0
   const processingService = new ProcessingService()
   const sourceSession = new SourceSession()
-  interface PixelEditTransaction {
-    label: string
-    before: PixelResult
-    dirty: { minX: number; minY: number; maxX: number; maxY: number } | null
-  }
-  let pixelEditTransaction: PixelEditTransaction | null = null
+  const editorSession = new EditorSession()
 
   function releaseCurrentSource(): void {
     latestProcessId += 1
@@ -284,8 +280,9 @@ export const useProjectStore = defineStore('project', () => {
     const offset = (y * result.value.width + x) * 4
     if (rgba.every((value, index) => value === result.value!.data[offset + index])) return
     if (record) pushHistory(label)
-    else if (pixelEditTransaction && !pixelEditTransaction.dirty) {
-      history.value.push({ label: pixelEditTransaction.label, result: cloneResult(pixelEditTransaction.before) })
+    else if (editorSession.active && !editorSession.hasChanges) {
+      const entry = editorSession.historyEntry()
+      if (entry) history.value.push(entry)
       if (history.value.length > 20) history.value.shift()
       future.value = []
     }
@@ -294,13 +291,8 @@ export const useProjectStore = defineStore('project', () => {
     result.value.data[offset + 1] = rgba[1]
     result.value.data[offset + 2] = rgba[2]
     result.value.data[offset + 3] = rgba[3]
-    if (pixelEditTransaction) {
-      const dirty = pixelEditTransaction.dirty ?? { minX: x, minY: y, maxX: x, maxY: y }
-      dirty.minX = Math.min(dirty.minX, x)
-      dirty.minY = Math.min(dirty.minY, y)
-      dirty.maxX = Math.max(dirty.maxX, x)
-      dirty.maxY = Math.max(dirty.maxY, y)
-      pixelEditTransaction.dirty = dirty
+    if (editorSession.active) {
+      const dirty = editorSession.recordChange(x, y)
       pixelEditDirtyBounds.value = { ...dirty }
     } else {
       refreshPalette()
@@ -308,27 +300,27 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   function beginPixelEdit(label: string): void {
-    if (!result.value || pixelEditTransaction) return
+    if (!result.value || editorSession.active) return
     pixelEditDirtyBounds.value = null
-    pixelEditTransaction = { label, before: cloneResult(result.value), dirty: null }
+    editorSession.begin(result.value, label)
   }
 
   function endPixelEdit(): void {
-    if (!pixelEditTransaction) return
-    if (pixelEditTransaction.dirty) refreshPalette()
-    pixelEditTransaction = null
+    if (!editorSession.active) return
+    if (editorSession.hasChanges) refreshPalette()
+    editorSession.end()
   }
 
   function cancelPixelEdit(): void {
-    if (!pixelEditTransaction || !result.value) return
-    const transaction = pixelEditTransaction
-    if (transaction.dirty) {
-      result.value = markRaw(transaction.before)
+    if (!editorSession.active || !result.value) return
+    const changed = editorSession.hasChanges
+    const before = editorSession.cancel()
+    if (before && changed) {
+      result.value = markRaw(before)
       const last = history.value[history.value.length - 1]
-      if (last?.label === transaction.label) history.value.pop()
+      if (last?.label === '画笔' || last?.label === '橡皮擦') history.value.pop()
       refreshPalette()
     }
-    pixelEditTransaction = null
     pixelEditDirtyBounds.value = null
   }
 
