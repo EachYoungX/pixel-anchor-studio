@@ -9,6 +9,7 @@ const canvas = ref<HTMLCanvasElement | null>(null)
 const showGrid = ref(true)
 const isPointerInside = ref(false)
 let observer: ResizeObserver | null = null
+let canvasCssSize = { width: 320, height: 400 }
 
 interface ViewTransform {
   scale: number
@@ -43,8 +44,14 @@ const activeRect = computed(() => (store.editTarget === 'anchor' ? store.anchor 
 
 function resizeCanvas(): void {
   if (!host.value || !canvas.value) return
-  canvas.value.width = Math.max(320, Math.floor(host.value.clientWidth))
-  canvas.value.height = Math.max(400, Math.min(620, Math.floor(window.innerHeight * 0.56)))
+  const width = Math.max(320, Math.floor(host.value.clientWidth))
+  const height = Math.max(400, Math.min(620, Math.floor(window.innerHeight * 0.56)))
+  const dpr = Math.min(window.devicePixelRatio || 1, 2)
+  canvasCssSize = { width, height }
+  canvas.value.width = Math.floor(width * dpr)
+  canvas.value.height = Math.floor(height * dpr)
+  canvas.value.style.width = `${width}px`
+  canvas.value.style.height = `${height}px`
   draw()
 }
 
@@ -52,13 +59,13 @@ function calculateView(): ViewTransform {
   if (!canvas.value || !store.source) return { scale: 1, offsetX: 0, offsetY: 0 }
   const padding = 24
   const fitScale = Math.min(
-    (canvas.value.width - padding * 2) / store.source.width,
-    (canvas.value.height - padding * 2) / store.source.height,
+    (canvasCssSize.width - padding * 2) / store.source.width,
+    (canvasCssSize.height - padding * 2) / store.source.height,
   )
   return {
     scale: fitScale * viewport.zoom,
-    offsetX: (canvas.value.width - store.source.width * fitScale) / 2 + viewport.panX,
-    offsetY: (canvas.value.height - store.source.height * fitScale) / 2 + viewport.panY,
+    offsetX: (canvasCssSize.width - store.source.width * fitScale) / 2 + viewport.panX,
+    offsetY: (canvasCssSize.height - store.source.height * fitScale) / 2 + viewport.panY,
   }
 }
 
@@ -80,8 +87,8 @@ function onWheel(event: WheelEvent): void {
   const fitScale = view.scale / viewport.zoom
   viewport.zoom = Math.max(0.25, Math.min(16, viewport.zoom * Math.exp(-event.deltaY * 0.002)))
   const nextScale = fitScale * viewport.zoom
-  viewport.panX = point.x - sourceX * nextScale - (canvas.value!.width - store.source!.width * fitScale) / 2
-  viewport.panY = point.y - sourceY * nextScale - (canvas.value!.height - store.source!.height * fitScale) / 2
+  viewport.panX = point.x - sourceX * nextScale - (canvasCssSize.width - store.source!.width * fitScale) / 2
+  viewport.panY = point.y - sourceY * nextScale - (canvasCssSize.height - store.source!.height * fitScale) / 2
   draw()
 }
 
@@ -181,14 +188,16 @@ function draw(): void {
   if (!element) return
   const context = element.getContext('2d')
   if (!context) return
-  context.clearRect(0, 0, element.width, element.height)
-  drawChecker(context, element.width, element.height)
+  const dpr = Math.min(window.devicePixelRatio || 1, 2)
+  context.setTransform(dpr, 0, 0, dpr, 0, 0)
+  context.clearRect(0, 0, canvasCssSize.width, canvasCssSize.height)
+  drawChecker(context, canvasCssSize.width, canvasCssSize.height)
 
   if (!store.sourceImage || !store.source) {
     context.fillStyle = '#69717A'
     context.font = '13px sans-serif'
     context.textAlign = 'center'
-    context.fillText('导入图片后在此调整裁剪、锚点与网格', element.width / 2, element.height / 2)
+    context.fillText('导入图片后在此调整裁剪、锚点与网格', canvasCssSize.width / 2, canvasCssSize.height / 2)
     return
   }
 
