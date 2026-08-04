@@ -7,6 +7,7 @@ const store = useProjectStore()
 const host = ref<HTMLDivElement | null>(null)
 const canvas = ref<HTMLCanvasElement | null>(null)
 const showGrid = ref(true)
+const isPointerInside = ref(false)
 let observer: ResizeObserver | null = null
 
 interface ViewTransform {
@@ -67,7 +68,9 @@ function resetViewport(): void {
 function onWheel(event: WheelEvent): void {
   if (!event.ctrlKey && !event.metaKey) return
   event.preventDefault()
-  const point = { x: event.offsetX, y: event.offsetY }
+  if (!canvas.value || !store.source) return
+  const bounds = canvas.value.getBoundingClientRect()
+  const point = { x: event.clientX - bounds.left, y: event.clientY - bounds.top }
   const sourceX = (point.x - view.offsetX) / view.scale
   const sourceY = (point.y - view.offsetY) / view.scale
   const fitScale = view.scale / viewport.zoom
@@ -327,12 +330,15 @@ onMounted(() => {
   observer = new ResizeObserver(resizeCanvas)
   if (host.value) observer.observe(host.value)
   resizeCanvas()
-  host.value?.addEventListener('wheel', onWheel, { passive: false })
   window.addEventListener('keydown', onKeyDown)
   window.addEventListener('keyup', onKeyUp)
 })
 
 function onKeyDown(event: KeyboardEvent): void {
+  const canvasFocused = document.activeElement === canvas.value
+  if (!canvasFocused && !isPointerInside.value) return
+  const target = event.target as HTMLElement | null
+  if (target && ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName)) return
   if (event.code === 'Space') { spacePressed = true; event.preventDefault() }
   if ((event.ctrlKey || event.metaKey) && event.key === '0') { event.preventDefault(); resetViewport() }
 }
@@ -357,7 +363,6 @@ function onCanvasKeydown(event: KeyboardEvent): void {
 
 onBeforeUnmount(() => {
   observer?.disconnect()
-  host.value?.removeEventListener('wheel', onWheel)
   window.removeEventListener('keydown', onKeyDown)
   window.removeEventListener('keyup', onKeyUp)
 })
@@ -376,6 +381,9 @@ onBeforeUnmount(() => {
       @pointermove="onPointerMove"
       @pointerup="onPointerUp"
       @pointercancel="onPointerUp"
+      @pointerenter="isPointerInside = true"
+      @pointerleave="isPointerInside = false; spacePressed = false"
+      @wheel="onWheel"
       @dblclick="resetViewport"
       tabindex="0"
       @keydown="onCanvasKeydown"
