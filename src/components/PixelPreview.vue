@@ -4,6 +4,7 @@ import { useProjectStore } from '@/stores/project'
 import type { PixelTool } from '@/types/project'
 
 const store = useProjectStore()
+const editorShell = ref<HTMLDivElement | null>(null)
 const canvas = ref<HTMLCanvasElement | null>(null)
 const viewport = ref<HTMLDivElement | null>(null)
 const zoom = ref(8)
@@ -86,6 +87,7 @@ function pixelFromPointer(event: PointerEvent): { x: number; y: number } | null 
 }
 
 function handlePointer(event: PointerEvent): void {
+  editorShell.value?.focus({ preventScroll: true })
   if (spacePressed || event.button === 1) {
     if (!viewport.value) return
     panning.value = true
@@ -146,9 +148,22 @@ function handleKeydown(event: KeyboardEvent): void {
 
 function handleWheel(event: WheelEvent): void {
   if (!event.ctrlKey && !event.metaKey) return
+  if (!viewport.value) return
   event.preventDefault()
+  const bounds = viewport.value.getBoundingClientRect()
+  const localX = event.clientX - bounds.left
+  const localY = event.clientY - bounds.top
+  const padding = 18
+  const oldZoom = zoom.value
+  const logicalX = (viewport.value.scrollLeft + localX - padding) / oldZoom
+  const logicalY = (viewport.value.scrollTop + localY - padding) / oldZoom
   const next = zoom.value * Math.exp(-event.deltaY * 0.002)
   zoom.value = Math.max(2, Math.min(14, Math.round(next)))
+  nextTick(() => {
+    if (!viewport.value) return
+    viewport.value.scrollLeft = logicalX * zoom.value - localX + padding
+    viewport.value.scrollTop = logicalY * zoom.value - localY + padding
+  })
 }
 function handleKeyup(event: KeyboardEvent): void {
   if (event.code === 'Space') spacePressed = false
@@ -164,7 +179,7 @@ onMounted(draw)
 </script>
 
 <template>
-  <div v-if="store.result" class="preview-shell" tabindex="0" @keydown="handleKeydown" @keyup="handleKeyup">
+  <div ref="editorShell" v-if="store.result" class="preview-shell" tabindex="0" @keydown="handleKeydown" @keyup="handleKeyup">
     <div class="editor-toolbar">
       <div class="tool-group">
         <button
