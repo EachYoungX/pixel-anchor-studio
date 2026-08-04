@@ -44,14 +44,27 @@ export function mergeSimilarColors(result: PixelResult, strength: MergeStrength)
     if (best) replacements.set(sourceKey, colorKey(...best.rgba))
   }
   if (replacements.size === 0) return { result, before, after: before }
+  function resolveReplacement(key: string): string {
+    const visited = new Set<string>()
+    let current = key
+    while (replacements.has(current) && !visited.has(current)) {
+      visited.add(current)
+      current = replacements.get(current)!
+    }
+    return current
+  }
   const next = new Uint8ClampedArray(result.data)
+  const actualColors = new Set<string>()
   for (let offset = 0; offset < next.length; offset += 4) {
     const key = colorKey(next[offset], next[offset + 1], next[offset + 2], next[offset + 3])
-    const replacement = replacements.get(key)
-    if (!replacement) continue
+    const replacement = resolveReplacement(key)
+    if (replacement === key) {
+      if (next[offset + 3] !== 0) actualColors.add(key)
+      continue
+    }
     const rgba = replacement.split(',').map(Number)
     next.set(rgba, offset)
+    actualColors.add(replacement)
   }
-  const mergedKeys = new Set(replacements.keys())
-  return { result: { ...result, data: next }, before, after: before - mergedKeys.size }
+  return { result: { ...result, data: next }, before, after: actualColors.size }
 }
