@@ -130,7 +130,7 @@ async function generate(): Promise<void> {
     </section>
 
     <section class="settings-section">
-      <div class="section-title"><h2>三、采样与颜色</h2></div>
+      <div class="section-title"><h2>三、采样与颜色处理</h2></div>
       <div class="field">
           <label for="sampling">单元格采样</label>
         <select id="sampling" v-model="store.processing.sampling" class="select">
@@ -161,6 +161,7 @@ async function generate(): Promise<void> {
           <option value="strong">强度：清理四格以内区域</option>
         </select>
       </div>
+      <p class="help">碎色清理会删除面积很小的孤立色块，并替换为周边颜色；可能同时删除高光、首饰或细线等真实细节，默认建议关闭。</p>
       <label class="checkbox-row">
         <span>保留透明区域</span>
         <input v-model="store.processing.preserveAlpha" type="checkbox" />
