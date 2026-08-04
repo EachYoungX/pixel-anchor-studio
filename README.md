@@ -4,7 +4,7 @@
 
 ## 当前版本
 
-当前版本为 `0.2.0`，已包含：
+当前版本为 `0.3.0`，已包含：
 
 - PNG、JPEG、WebP等浏览器支持图片的本地导入；
 - 原图整数像素吸附裁剪框，可拖动、四角缩放和键盘微调；
@@ -19,7 +19,7 @@
 - PNG原尺寸与整数倍导出；
 - 拼豆SVG、分页PDF、颜色CSV导出；
 - 四边行列号、格内色号、色号图例与数量统计；
-- 本地项目JSON v2保存与重新打开，并兼容v1项目；
+- 本地项目JSON v3保存与重新打开，并兼容v1/v2项目迁移；
 - 图像处理在Web Worker中执行，不上传图片。
 
 ## 运行环境
@@ -98,11 +98,6 @@ src/
   stores/                 Pinia项目状态与编辑历史
   types/                  数据模型
   workers/                Web Worker入口
-  docs/
-  INTERNAL_DEVELOPMENT_PLAN.md
-  ARCHITECTURE.md
-  ALGORITHM_NOTES.md
-  OPEN_SOURCE_NOTICES.md
 CHANGELOG.md               对外版本日志
 ```
 
@@ -112,17 +107,13 @@ CHANGELOG.md               对外版本日志
 - 伪像素网格尺度需要手动调整，自动周期估计安排在后续版本；
 - 当前量化采用项目内置Median Cut，暂未提供厂商拼豆色板；
 - 像素编辑器是最终修正工具，不是完整的图层式像素绘画软件；
-- 项目JSON包含原图Data URL，文件体积可能接近或高于原图体积；
+- 项目JSON在保存时会内嵌原图数据，文件体积可能接近或高于原图体积；
 - 大型 `256 × 256` 拼豆PDF会产生大量矢量单元和分页，生成时间取决于浏览器性能。
 
 ## 文档
 
-- 内部开发计划：[`docs/INTERNAL_DEVELOPMENT_PLAN.md`](docs/INTERNAL_DEVELOPMENT_PLAN.md)
-- 架构说明：[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
-- 算法说明：[`docs/ALGORITHM_NOTES.md`](docs/ALGORITHM_NOTES.md)
-- 开源依赖：[`docs/OPEN_SOURCE_NOTICES.md`](docs/OPEN_SOURCE_NOTICES.md)
 - 对外版本日志：[`CHANGELOG.md`](CHANGELOG.md)
 
 ## 许可证
 
-项目代码采用MIT License。第三方依赖的许可证见 `docs/OPEN_SOURCE_NOTICES.md`。
+项目代码采用MIT License。
