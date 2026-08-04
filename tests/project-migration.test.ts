@@ -39,4 +39,20 @@ describe('migrateProject', () => {
     expect(project.bead.pageColumns).toBe(32)
     expect(project.bead.pageRows).toBe(32)
   })
+
+  it('defaults a missing direct size to 32 without changing explicit sizes', () => {
+    const missing = migrateProject({
+      ...baseProject,
+      version: 3,
+      scale: { mode: 'direct' },
+    })
+    const explicit = migrateProject({
+      ...baseProject,
+      version: 3,
+      scale: { mode: 'direct', directLongSide: 128 },
+    })
+
+    expect(missing.scale.directLongSide).toBe(32)
+    expect(explicit.scale.directLongSide).toBe(128)
+  })
 })

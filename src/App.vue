@@ -27,7 +27,7 @@ useGlobalShortcuts()
       <template v-if="workspaceMode === 'pixel'">
         <SettingsPanel class="panel panel-left" />
         <main class="main-stage">
-        <section class="stage-page">
+        <section class="stage-page stage-page--source">
           <div class="stage-heading">
             <div>
               <h2>原图与网格</h2>
@@ -39,7 +39,7 @@ useGlobalShortcuts()
           </div>
           <div class="stage-page-body"><SourceCanvas /></div>
         </section>
-        <section class="stage-page">
+        <section class="stage-page stage-page--result">
           <div class="stage-heading">
             <div>
               <h2>像素结果</h2>

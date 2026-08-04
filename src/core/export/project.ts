@@ -40,7 +40,7 @@ export function migrateProject(value: unknown): SerializedProject {
   const currentSnap = legacyScale.snapMode ?? (mode === 'pseudo' ? 'target-cell' : 'source-pixel')
   const currentScale: ScaleSettings = {
     mode,
-    directLongSide: legacyScale.directLongSide ?? legacyScale.directValue ?? 64,
+    directLongSide: legacyScale.directLongSide ?? legacyScale.directValue ?? 32,
     anchorCells: legacyScale.anchorCells ?? 3,
     pseudoCellSize: legacyScale.pseudoCellSize ?? 8,
     offsetX: legacyScale.offsetX ?? 0,

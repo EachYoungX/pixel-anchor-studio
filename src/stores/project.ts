@@ -34,7 +34,7 @@ const defaultSnapSettings = (): SnapSettings => ({
 
 const defaultScale = (): ScaleSettings => ({
   mode: 'direct',
-  directLongSide: 64,
+  directLongSide: 32,
   anchorCells: 3,
   pseudoCellSize: 8,
   offsetX: 0,
