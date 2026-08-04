@@ -90,16 +90,15 @@ function getWorker(): Worker {
   return worker
 }
 
-function loadSource(sourceId: string, input: WorkerSourceInput): Promise<void> {
+function loadSource(sourceId: string, input: WorkerSourceInput, timeoutMs: number): Promise<void> {
   if (loadedSources.has(sourceId)) return Promise.resolve()
   const existing = sourceLoads.get(sourceId)
   if (existing) return existing
   getWorker()
   const promise = new Promise<void>((resolve, reject) => {
     const timer = setTimeout(() => {
-      sourceLoadCallbacks.delete(sourceId)
       rejectWorkerRequests(new Error('加载原图超时，请重新导入图片'))
-    }, PROCESS_TIMEOUT_MS)
+    }, timeoutMs)
     sourceLoadCallbacks.set(sourceId, { resolve, reject, timer })
     try {
       post({ type: 'load-source', protocol: PROTOCOL_VERSION, sourceId, source: input }, input.data ? [input.data.buffer as ArrayBuffer] : undefined)
@@ -113,7 +112,7 @@ function loadSource(sourceId: string, input: WorkerSourceInput): Promise<void> {
   return promise
 }
 
-export async function runProcessing(request: ProcessRequest, sourceId = request.sourceId ?? 'default'): Promise<ProcessResponse> {
+export async function runProcessing(request: ProcessRequest, sourceId = request.sourceId ?? 'default', timeoutMs = PROCESS_TIMEOUT_MS): Promise<ProcessResponse> {
   const activeWorker = getWorker()
   const sourceData = request.sourceFile ? undefined : new Uint8ClampedArray(request.source.data)
   await loadSource(sourceId, {
@@ -121,14 +120,13 @@ export async function runProcessing(request: ProcessRequest, sourceId = request.
     height: request.source.height,
     data: sourceData,
     blob: request.sourceFile,
-  })
+  }, timeoutMs)
   const requestId = ++sequence
   const { source: _source, sourceFile: _sourceFile, ...settings } = request
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
-      pending.delete(requestId)
       rejectWorkerRequests(new Error('处理超时，请降低输出尺寸或重新导入图片'))
-    }, PROCESS_TIMEOUT_MS)
+    }, timeoutMs)
     pending.set(requestId, { resolve, reject, timer })
     try {
       activeWorker.postMessage({ type: 'process', protocol: PROTOCOL_VERSION, ...settings, requestId, sourceId })
