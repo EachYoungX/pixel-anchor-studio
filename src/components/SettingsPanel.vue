@@ -58,8 +58,8 @@ async function generate(): Promise<void> {
         <div class="field">
           <label for="direct-value">长边像素数</label>
           <div class="range-row">
-            <input id="direct-value" v-model.number="store.scale.directValue" class="range" type="range" min="8" max="256" step="1" />
-            <input v-model.number="store.scale.directValue" class="input" type="number" min="1" max="256" />
+            <input id="direct-value" v-model.number="store.scale.directLongSide" class="range" type="range" min="8" max="256" step="1" />
+            <input v-model.number="store.scale.directLongSide" class="input" type="number" min="1" max="256" />
           </div>
         </div>
         <p class="help">锁定原图比例，短边会依据当前裁剪比例自动计算，不进行非等比拉伸。</p>

@@ -1,6 +1,5 @@
 export type ScaleMode = 'direct' | 'anchor' | 'pseudo'
 export type CropMode = 'custom' | 'full' | 'center-square'
-export type DirectAxis = 'width' | 'height' | 'longSide'
 export type SamplingMode = 'average' | 'median' | 'dominant' | 'nearest'
 export type CleanupStrength = 'off' | 'light' | 'medium' | 'strong'
 export type MergeStrength = 'off' | 'conservative' | 'balanced' | 'strong'
@@ -31,19 +30,18 @@ export interface CropSettings {
 export interface SourceState {
   name: string
   dataUrl: string
+  previewUrl?: string
   width: number
   height: number
 }
 
 export interface ScaleSettings {
   mode: ScaleMode
-  directAxis: DirectAxis
-  directValue: number
+  directLongSide: number
   anchorCells: number
   pseudoCellSize: number
   offsetX: number
   offsetY: number
-  snapToGrid?: boolean
   snapMode?: SnapMode
   snapSettings?: SnapSettings
 }
@@ -91,7 +89,7 @@ export interface SerializedPixelResult {
 
 export interface SerializedProject {
   format: 'pixel-anchor-project'
-  version: 1 | 2
+  version: 3
   savedAt: string
   source: SourceState | null
   crop: Rect

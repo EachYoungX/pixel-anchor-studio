@@ -22,28 +22,9 @@ export function calculateOutputDimensions(
 ): OutputDimensions {
   const cropWidth = Math.max(1, crop.width)
   const cropHeight = Math.max(1, crop.height)
-  const aspect = cropWidth / cropHeight
-
   if (settings.mode === 'direct') {
-    const requested = clampDimension(settings.directValue)
-    let width = requested
-    let height = requested
-
-    if (settings.directAxis === 'width') {
-      width = requested
-      height = width / aspect
-    } else if (settings.directAxis === 'height') {
-      height = requested
-      width = height * aspect
-    } else if (cropWidth >= cropHeight) {
-      width = requested
-      height = width / aspect
-    } else {
-      height = requested
-      width = height * aspect
-    }
-
-    const requestedCellSize = Math.max(0.25, Math.max(cropWidth / width, cropHeight / height))
+    const requested = clampDimension(settings.directLongSide)
+    const requestedCellSize = Math.max(0.25, Math.max(cropWidth, cropHeight) / requested)
     const geometry = createGridGeometry(crop, requestedCellSize, settings.offsetX, settings.offsetY)
     return {
       width: geometry.outputWidth,

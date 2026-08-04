@@ -8,8 +8,7 @@ const anchor: Rect = { x: 100, y: 100, width: 90, height: 90 }
 function settings(overrides: Partial<ScaleSettings>): ScaleSettings {
   return {
     mode: 'direct',
-    directAxis: 'longSide',
-    directValue: 256,
+    directLongSide: 256,
     anchorCells: 3,
     pseudoCellSize: 8,
     offsetX: 0,

@@ -2,7 +2,7 @@ import { computed, markRaw, reactive, ref, toRaw, watch } from 'vue'
 import { defineStore } from 'pinia'
 import { hexToRgba, rgbToHsl, rgbaToHex } from '@/core/color'
 import { calculateOutputDimensions } from '@/core/dimensions'
-import { loadHtmlImage, loadSourceFile, imageToImageData } from '@/core/image/load'
+import { imageToDataUrl, imageToImageData, loadHtmlImage, loadSourceFile } from '@/core/image/load'
 import { buildPalette } from '@/core/palette'
 import { mergeSimilarColors } from '@/core/processing/palette-merge'
 import { base64ToBytes, bytesToBase64 } from '@/core/export/project'
@@ -34,13 +34,11 @@ const defaultSnapSettings = (): SnapSettings => ({
 
 const defaultScale = (): ScaleSettings => ({
   mode: 'direct',
-  directAxis: 'longSide',
-  directValue: 64,
+  directLongSide: 64,
   anchorCells: 3,
   pseudoCellSize: 8,
   offsetX: 0,
   offsetY: 0,
-  snapToGrid: false,
   snapMode: 'source-pixel',
   snapSettings: defaultSnapSettings(),
 })
@@ -121,6 +119,7 @@ export const useProjectStore = defineStore('project', () => {
     latestProcessId += 1
     sourceRevision += 1
     releaseProcessingSource(sourceId.value)
+    if (source.value?.previewUrl?.startsWith('blob:')) URL.revokeObjectURL(source.value.previewUrl)
     sourceId.value = `source-${sourceRevision}`
     cachedProcessKey = ''
     cachedProcessResult = null
@@ -450,9 +449,16 @@ export const useProjectStore = defineStore('project', () => {
   function serialize(): SerializedProject {
     return {
       format: 'pixel-anchor-project',
-      version: 2,
+      version: 3,
       savedAt: new Date().toISOString(),
-      source: source.value ? { ...source.value } : null,
+      source: source.value
+        ? {
+            name: source.value.name,
+            dataUrl: source.value.dataUrl || (sourceImage.value ? imageToDataUrl(sourceImage.value) : ''),
+            width: source.value.width,
+            height: source.value.height,
+          }
+        : null,
       crop: { ...toRaw(crop) },
       cropSettings: { mode: cropSettings.mode, customRect: { ...toRaw(crop) } },
       anchor: { ...toRaw(anchor) },
