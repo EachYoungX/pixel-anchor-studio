@@ -1,4 +1,5 @@
 import type { Rect, ScaleSettings } from '@/types/project'
+import { createGridGeometry, type GridGeometry } from '@/core/grid-geometry'
 
 export const MAX_OUTPUT_SIZE = 256
 
@@ -7,28 +8,11 @@ export interface OutputDimensions {
   height: number
   adjusted: boolean
   sourceCellSize: number
+  geometry: GridGeometry
 }
 
 function clampDimension(value: number): number {
   return Math.max(1, Math.min(MAX_OUTPUT_SIZE, Math.round(value)))
-}
-
-function fitWithinLimit(width: number, height: number): { width: number; height: number; adjusted: boolean } {
-  const maxSide = Math.max(width, height)
-  if (maxSide <= MAX_OUTPUT_SIZE) {
-    return {
-      width: clampDimension(width),
-      height: clampDimension(height),
-      adjusted: false,
-    }
-  }
-
-  const ratio = MAX_OUTPUT_SIZE / maxSide
-  return {
-    width: clampDimension(width * ratio),
-    height: clampDimension(height * ratio),
-    adjusted: true,
-  }
 }
 
 export function calculateOutputDimensions(
@@ -59,27 +43,37 @@ export function calculateOutputDimensions(
       width = height * aspect
     }
 
-    const fitted = fitWithinLimit(width, height)
+    const requestedCellSize = Math.max(0.25, Math.max(cropWidth / width, cropHeight / height))
+    const geometry = createGridGeometry(crop, requestedCellSize, settings.offsetX, settings.offsetY)
     return {
-      ...fitted,
-      sourceCellSize: cropWidth / fitted.width,
+      width: geometry.outputWidth,
+      height: geometry.outputHeight,
+      adjusted: geometry.adjustedByLimit,
+      sourceCellSize: geometry.cellSize,
+      geometry,
     }
   }
 
   if (settings.mode === 'anchor') {
     const anchorSide = Math.max(1, (anchor.width + anchor.height) / 2)
     const sourceCellSize = anchorSide / Math.max(1, settings.anchorCells)
-    const fitted = fitWithinLimit(cropWidth / sourceCellSize, cropHeight / sourceCellSize)
+    const geometry = createGridGeometry(crop, sourceCellSize, settings.offsetX, settings.offsetY)
     return {
-      ...fitted,
-      sourceCellSize: Math.max(cropWidth / fitted.width, cropHeight / fitted.height),
+      width: geometry.outputWidth,
+      height: geometry.outputHeight,
+      adjusted: geometry.adjustedByLimit,
+      sourceCellSize: geometry.cellSize,
+      geometry,
     }
   }
 
   const sourceCellSize = Math.max(0.25, settings.pseudoCellSize)
-  const fitted = fitWithinLimit(cropWidth / sourceCellSize, cropHeight / sourceCellSize)
+  const geometry = createGridGeometry(crop, sourceCellSize, settings.offsetX, settings.offsetY)
   return {
-    ...fitted,
-    sourceCellSize: Math.max(cropWidth / fitted.width, cropHeight / fitted.height),
+    width: geometry.outputWidth,
+    height: geometry.outputHeight,
+    adjusted: geometry.adjustedByLimit,
+    sourceCellSize: geometry.cellSize,
+    geometry,
   }
 }

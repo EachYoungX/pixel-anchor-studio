@@ -277,6 +277,11 @@ export const useProjectStore = defineStore('project', () => {
         },
         crop: { ...toRaw(effectiveCrop.value) },
         output: { width: dimensions.width, height: dimensions.height },
+        grid: {
+          cellSize: dimensions.geometry.cellSize,
+          originX: dimensions.geometry.originX,
+          originY: dimensions.geometry.originY,
+        },
         scaleOffset: { x: scale.offsetX, y: scale.offsetY },
         processing: { ...toRaw(processing) },
       }, sourceId.value)

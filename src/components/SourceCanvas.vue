@@ -117,6 +117,7 @@ function drawGrid(context: CanvasRenderingContext2D): void {
   if (!showGrid.value || !store.source) return
   const crop = toScreen(store.effectiveCrop)
   const output = store.outputDimensions
+  const geometry = output.geometry
   const stepX = Math.max(1, Math.ceil(output.width / 64))
   const stepY = Math.max(1, Math.ceil(output.height / 64))
   context.save()
@@ -126,14 +127,14 @@ function drawGrid(context: CanvasRenderingContext2D): void {
   context.strokeStyle = 'rgba(52, 73, 94, 0.30)'
   context.lineWidth = 1
   for (let x = 0; x <= output.width; x += stepX) {
-    const position = crop.x + ((x + store.scale.offsetX) / output.width) * crop.width
+    const position = view.offsetX + (geometry.originX + x * geometry.cellSize) * view.scale
     context.beginPath()
     context.moveTo(Math.round(position) + 0.5, crop.y)
     context.lineTo(Math.round(position) + 0.5, crop.y + crop.height)
     context.stroke()
   }
   for (let y = 0; y <= output.height; y += stepY) {
-    const position = crop.y + ((y + store.scale.offsetY) / output.height) * crop.height
+    const position = view.offsetY + (geometry.originY + y * geometry.cellSize) * view.scale
     context.beginPath()
     context.moveTo(crop.x, Math.round(position) + 0.5)
     context.lineTo(crop.x + crop.width, Math.round(position) + 0.5)

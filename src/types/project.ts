@@ -116,6 +116,11 @@ export interface ProcessRequest {
     width: number
     height: number
   }
+  grid?: {
+    cellSize: number
+    originX: number
+    originY: number
+  }
   scaleOffset: {
     x: number
     y: number

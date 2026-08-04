@@ -17,16 +17,17 @@ function pixelOffset(width: number, x: number, y: number): number {
 
 function boundsForCell(request: ProcessRequest, targetX: number, targetY: number): SampleBounds {
   const { crop, output, scaleOffset, source } = request
-  const cellWidth = crop.width / output.width
-  const cellHeight = crop.height / output.height
-  const shiftedX = crop.x + (targetX + scaleOffset.x) * cellWidth
-  const shiftedY = crop.y + (targetY + scaleOffset.y) * cellHeight
+  const cellSize = request.grid?.cellSize ?? Math.max(crop.width / output.width, crop.height / output.height)
+  const originX = request.grid?.originX ?? crop.x + scaleOffset.x * cellSize
+  const originY = request.grid?.originY ?? crop.y + scaleOffset.y * cellSize
+  const shiftedX = originX + targetX * cellSize
+  const shiftedY = originY + targetY * cellSize
 
   return {
     x0: clamp(shiftedX, 0, source.width - 1),
     y0: clamp(shiftedY, 0, source.height - 1),
-    x1: clamp(shiftedX + cellWidth, 0, source.width),
-    y1: clamp(shiftedY + cellHeight, 0, source.height),
+    x1: clamp(shiftedX + cellSize, 0, source.width),
+    y1: clamp(shiftedY + cellSize, 0, source.height),
   }
 }
 
