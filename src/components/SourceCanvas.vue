@@ -341,6 +341,12 @@ watch(
   { deep: false },
 )
 
+watch(
+  () => [viewport.zoom.value, viewport.panX.value, viewport.panY.value],
+  () => scheduleDraw(),
+  { deep: false },
+)
+
 onMounted(() => {
   observer = new ResizeObserver(resizeCanvas)
   if (host.value) observer.observe(host.value)
