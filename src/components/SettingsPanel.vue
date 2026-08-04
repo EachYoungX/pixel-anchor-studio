@@ -127,6 +127,7 @@ async function generate(): Promise<void> {
         </label>
         <button class="button button-small" type="button" @click="store.resetGridPhase">偏移归零</button>
       </div>
+      <label class="checkbox-row"><span>移动框体时对齐目标网格</span><input v-model="store.scale.snapToGrid" type="checkbox" /></label>
     </section>
 
     <section class="settings-section">

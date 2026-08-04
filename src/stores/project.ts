@@ -31,6 +31,7 @@ const defaultScale = (): ScaleSettings => ({
   pseudoCellSize: 8,
   offsetX: 0,
   offsetY: 0,
+  snapToGrid: false,
 })
 
 const defaultProcessing = (): ProcessingSettings => ({

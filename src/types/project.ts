@@ -36,6 +36,7 @@ export interface ScaleSettings {
   pseudoCellSize: number
   offsetX: number
   offsetY: number
+  snapToGrid?: boolean
 }
 
 export interface ProcessingSettings {

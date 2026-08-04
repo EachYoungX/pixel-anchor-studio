@@ -293,6 +293,12 @@ function onPointerMove(event: PointerEvent): void {
   let next: Rect
   if (drag.action === 'move') {
     next = { ...drag.startRect, x: drag.startRect.x + dx, y: drag.startRect.y + dy }
+    if (store.scale.snapToGrid) {
+      const stepX = store.effectiveCrop.width / Math.max(1, store.outputDimensions.width)
+      const stepY = store.effectiveCrop.height / Math.max(1, store.outputDimensions.height)
+      next.x = store.effectiveCrop.x + Math.round((next.x - store.effectiveCrop.x) / stepX) * stepX
+      next.y = store.effectiveCrop.y + Math.round((next.y - store.effectiveCrop.y) / stepY) * stepY
+    }
   } else {
     next = resizedRect(drag.startRect, drag.handle, dx, dy)
   }
