@@ -130,20 +130,25 @@ function drawGrid(context: CanvasRenderingContext2D): void {
 
 function drawRect(context: CanvasRenderingContext2D, rect: Rect, active: boolean, label: string, color: string): void {
   const screen = toScreen(rect)
+  const borderX = Math.round(screen.x) + 0.5
+  const borderY = Math.round(screen.y) + 0.5
+  const borderWidth = Math.max(1, Math.round(screen.width))
+  const borderHeight = Math.max(1, Math.round(screen.height))
   context.save()
   context.strokeStyle = color
   context.lineWidth = active ? 2 : 1.2
   context.setLineDash(active ? [] : [6, 4])
-  context.strokeRect(screen.x, screen.y, screen.width, screen.height)
+  context.strokeRect(borderX, borderY, borderWidth, borderHeight)
   context.setLineDash([])
   context.fillStyle = color
   context.font = '12px sans-serif'
   const labelWidth = context.measureText(label).width + 12
-  const labelY = screen.y >= 24 ? screen.y - 22 : screen.y + 2
-  context.fillRect(Math.round(screen.x), Math.round(labelY), Math.ceil(labelWidth), 20)
+  const labelHeight = 20
+  const labelY = borderY >= labelHeight ? borderY - labelHeight : borderY
+  context.fillRect(Math.floor(borderX), Math.floor(labelY), Math.ceil(labelWidth), labelHeight)
   context.fillStyle = '#FFFFFF'
   context.textBaseline = 'middle'
-  context.fillText(label, Math.round(screen.x + 6), Math.round(labelY + 10))
+  context.fillText(label, Math.floor(borderX + 6), Math.floor(labelY + labelHeight / 2))
 
   if (active) {
     const handleSize = 8
