@@ -24,6 +24,7 @@ const painting = ref(false)
 const transactionOpen = ref(false)
 let lastPixel = ''
 let observer: ResizeObserver | null = null
+let fullImageDraw = true
 const toolOptions: Array<[PixelTool, string]> = [
   ['brush', '画笔'],
   ['eyedropper', '吸管'],
@@ -73,10 +74,16 @@ function drawImage(): void {
   const context = canvas.getContext('2d')
   if (!context) return
   context.imageSmoothingEnabled = false
-  context.clearRect(0, 0, result.width, result.height)
   const imageData = context.createImageData(result.width, result.height)
   imageData.data.set(result.data)
-  context.putImageData(imageData, 0, 0)
+  const dirty = fullImageDraw ? null : store.consumePixelEditDirtyBounds()
+  if (dirty) {
+    context.putImageData(imageData, 0, 0, dirty.minX, dirty.minY, dirty.maxX - dirty.minX + 1, dirty.maxY - dirty.minY + 1)
+  } else {
+    context.clearRect(0, 0, result.width, result.height)
+    context.putImageData(imageData, 0, 0)
+  }
+  fullImageDraw = false
 }
 
 function drawOverlay(): void {
@@ -138,6 +145,7 @@ function handlePrimaryPointerDown(event: PointerEvent): void {
     transactionOpen.value = true
     store.applyTool(pixel.x, pixel.y, false)
   } else {
+    fullImageDraw = store.pixelTool === 'fill'
     store.applyTool(pixel.x, pixel.y)
   }
   painting.value = store.pixelTool === 'brush' || store.pixelTool === 'eraser'
@@ -183,6 +191,7 @@ function handleDoubleClick(event: MouseEvent): void {
 watch(
   () => [store.result, showGrid.value],
   () => nextTick(() => {
+    fullImageDraw = true
     if (viewportController.mode.value === 'fit') resetView()
     scheduleDraw()
   }),

@@ -7,6 +7,7 @@ import { mergeSimilarColors } from '@/core/processing/palette-merge'
 import { base64ToBytes, bytesToBase64 } from '@/core/export/project'
 import { ProcessingService } from '@/domain/processing/processing-service'
 import { SourceSession } from '@/domain/source/source-session'
+import type { DirtyBounds } from '@/domain/editor/pixel-operations'
 import { defaultBead, defaultProcessing, defaultScale, defaultSnapSettings } from '@/domain/project/defaults'
 import type {
   BeadSettings,
@@ -72,6 +73,7 @@ export const useProjectStore = defineStore('project', () => {
   const lastDurationMs = ref(0)
   const history = ref<HistoryEntry[]>([])
   const future = ref<HistoryEntry[]>([])
+  const pixelEditDirtyBounds = ref<DirtyBounds | null>(null)
   const canUndo = computed(() => history.value.length > 0)
   const canRedo = computed(() => future.value.length > 0)
   const undoLabel = computed(() => history.value[history.value.length - 1]?.label ?? '撤销')
@@ -103,6 +105,7 @@ export const useProjectStore = defineStore('project', () => {
     colorCodes.value = {}
     history.value = []
     future.value = []
+    pixelEditDirtyBounds.value = null
     status.value = '已释放当前图片'
   }
 
@@ -298,6 +301,7 @@ export const useProjectStore = defineStore('project', () => {
       dirty.maxX = Math.max(dirty.maxX, x)
       dirty.maxY = Math.max(dirty.maxY, y)
       pixelEditTransaction.dirty = dirty
+      pixelEditDirtyBounds.value = { ...dirty }
     } else {
       refreshPalette()
     }
@@ -305,6 +309,7 @@ export const useProjectStore = defineStore('project', () => {
 
   function beginPixelEdit(label: string): void {
     if (!result.value || pixelEditTransaction) return
+    pixelEditDirtyBounds.value = null
     pixelEditTransaction = { label, before: cloneResult(result.value), dirty: null }
   }
 
@@ -324,6 +329,13 @@ export const useProjectStore = defineStore('project', () => {
       refreshPalette()
     }
     pixelEditTransaction = null
+    pixelEditDirtyBounds.value = null
+  }
+
+  function consumePixelEditDirtyBounds(): DirtyBounds | null {
+    const bounds = pixelEditDirtyBounds.value ? { ...pixelEditDirtyBounds.value } : null
+    pixelEditDirtyBounds.value = null
+    return bounds
   }
 
   function applyPixelChange(x: number, y: number, color: string): void {
@@ -565,6 +577,7 @@ export const useProjectStore = defineStore('project', () => {
     applyPixelChange,
     endPixelEdit,
     cancelPixelEdit,
+    consumePixelEditDirtyBounds,
     mergeColor,
     mergeSimilar,
     undo,
