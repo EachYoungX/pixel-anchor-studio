@@ -182,6 +182,12 @@ function resetView(): void {
   viewport.value.scrollLeft = 0
   viewport.value.scrollTop = 0
 }
+
+function handleDoubleClick(event: MouseEvent): void {
+  event.preventDefault()
+  event.stopPropagation()
+  resetView()
+}
 function handleKeyup(event: KeyboardEvent): void {
   if (event.code === 'Space') spacePressed = false
 }
@@ -233,7 +239,7 @@ onBeforeUnmount(() => observer?.disconnect())
         <label class="grid-toggle"><input v-model="showGrid" type="checkbox" /> 显示网格</label>
       </div>
     </div>
-    <div ref="viewport" class="pixel-viewport" @wheel="handleWheel" @pointermove="handlePointerMove" @pointerup="handlePointerUp" @pointercancel="handlePointerUp" @dblclick="resetView">
+    <div ref="viewport" class="pixel-viewport" @wheel="handleWheel" @pointermove="handlePointerMove" @pointerup="handlePointerUp" @pointercancel="handlePointerUp" @dblclick="handleDoubleClick">
       <div class="pixel-stage" :style="{ width: `${stageSize.width}px`, height: `${stageSize.height}px` }"><canvas ref="canvas" class="pixel-canvas" @pointerdown="handlePointer" /></div>
     </div>
   </div>
@@ -259,9 +265,9 @@ onBeforeUnmount(() => observer?.disconnect())
 .color-picker-label { display: flex; align-items: center; gap: 7px; color: #4f565e; font-size: 11px; }
 .color-picker { width: 30px; height: 26px; padding: 1px; border: 1px solid var(--border-strong); border-radius: 5px; background: #ffffff; }
 .color-picker-label code { color: #4b5158; font-size: 11px; }
-.pixel-viewport { min-height: 0; min-width: 0; overflow: auto; padding: 18px; background: #e9ebee; }
-.pixel-stage { min-width: 100%; min-height: 100%; display: grid; place-items: center; }
-.pixel-canvas { display: block; margin: auto; background: #ffffff; touch-action: none; image-rendering: pixelated; cursor: crosshair; }
+.pixel-viewport { min-height: 0; min-width: 0; overflow: auto; padding: 18px; background: #e9ebee; user-select: none; -webkit-user-select: none; }
+.pixel-stage { min-width: 100%; min-height: 100%; display: grid; place-items: center; user-select: none; -webkit-user-select: none; }
+.pixel-canvas { display: block; margin: auto; background: #ffffff; touch-action: none; image-rendering: pixelated; cursor: crosshair; user-select: none; -webkit-user-select: none; }
 @media (max-width: 980px) {
   .view-actions { width: 100%; justify-content: flex-end; }
 }

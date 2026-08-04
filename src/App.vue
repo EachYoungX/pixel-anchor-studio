@@ -33,9 +33,6 @@ useGlobalShortcuts()
               <h2>原图与网格</h2>
               <p>{{ store.sourceLabel }}</p>
             </div>
-            <span class="dimension-badge">
-              输出 {{ store.outputDimensions.width }} × {{ store.outputDimensions.height }}
-            </span>
           </div>
           <div class="stage-page-body"><SourceCanvas /></div>
         </section>
@@ -45,6 +42,9 @@ useGlobalShortcuts()
               <h2>像素结果</h2>
               <p>点击像素进行基础修正，处理结果始终保留为逻辑像素矩阵。</p>
             </div>
+            <span class="dimension-badge">
+              输出 {{ store.outputDimensions.width }} × {{ store.outputDimensions.height }}
+            </span>
           </div>
           <div class="stage-page-body"><PixelPreview /></div>
         </section>

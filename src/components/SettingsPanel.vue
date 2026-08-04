@@ -96,7 +96,7 @@ async function generate(): Promise<void> {
         <div class="field">
           <label for="pseudo-size">每格覆盖的原图像素</label>
           <div class="range-row">
-            <input id="pseudo-size" v-model.number="store.scale.pseudoCellSize" class="range" type="range" min="1" max="64" step="0.25" />
+            <input id="pseudo-size" v-model.number="store.scale.pseudoCellSize" class="range" type="range" min="1" max="128" step="0.25" />
             <input v-model.number="store.scale.pseudoCellSize" class="input" type="number" min="0.25" max="128" step="0.25" />
           </div>
         </div>
