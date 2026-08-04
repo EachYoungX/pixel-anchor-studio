@@ -20,7 +20,7 @@ const workspaceMode = ref<WorkspaceMode>('pixel')
       <button class="button button-small" :class="{ 'button-active': workspaceMode === 'pixel' }" type="button" @click="workspaceMode = 'pixel'">像素化与编辑</button>
       <button class="button button-small" :class="{ 'button-active': workspaceMode === 'bead' }" type="button" :disabled="!store.result" @click="workspaceMode = 'bead'">拼豆图导出</button>
     </nav>
-    <div class="workspace">
+    <div class="workspace" :class="{ 'workspace--bead': workspaceMode === 'bead' }">
       <SettingsPanel v-if="workspaceMode === 'pixel'" class="panel panel-left" />
       <main class="main-stage">
         <BeadWorkspace v-if="workspaceMode === 'bead'" class="stage-card" />
