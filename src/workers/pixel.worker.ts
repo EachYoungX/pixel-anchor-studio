@@ -3,6 +3,7 @@
 import { createProcessingCaches, processImage } from '@/core/processing/process'
 import type { ProcessRequest } from '@/types/project'
 import { BitmapSourceBackend } from '@/workers/source-backends/bitmap-source-backend'
+import { cropEnvelope } from '@/workers/source-backends/source-backend'
 import { RgbaSourceBackend } from '@/workers/source-backends/rgba-source-backend'
 import type { WorkerSourceInput } from '@/workers/source-backends/source-backend'
 
@@ -50,6 +51,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
     bitmapBackend.release(message.sourceId)
     rgbaBackend.release(message.sourceId)
     sourceBackends.delete(message.sourceId)
+    processingCaches.crop.clear()
     processingCaches.sampling.clear()
     processingCaches.quantized.clear()
     processingCaches.final.clear()
@@ -59,6 +61,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
     bitmapBackend.clear()
     rgbaBackend.clear()
     sourceBackends.clear()
+    processingCaches.crop.clear()
     processingCaches.sampling.clear()
     processingCaches.quantized.clear()
     processingCaches.final.clear()
@@ -68,9 +71,22 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
   try {
     const backend = sourceBackends.get(message.sourceId)
     if (!backend) throw new Error('源图缓存不存在，请重新导入图片')
-    const source = backend === 'bitmap' ? bitmapBackend.readSource(message.sourceId) : rgbaBackend.readSource(message.sourceId)
-    const { requestId, sourceId, type: _type, protocol: _protocol, ...settings } = message
-    const response = processImage({ ...settings, source, sourceId }, processingCaches)
+    const sourceBackend = backend === 'bitmap' ? bitmapBackend : rgbaBackend
+    const dimensions = sourceBackend.getDimensions(message.sourceId)
+    const envelope = cropEnvelope(message.crop, dimensions)
+    const cropKey = `${message.sourceId}:${envelope.originX},${envelope.originY},${envelope.width},${envelope.height}`
+    const source = processingCaches.crop.get(cropKey) ?? sourceBackend.readCrop(message.sourceId, { x: envelope.originX, y: envelope.originY, width: envelope.width, height: envelope.height })
+    if (!processingCaches.crop.has(cropKey)) processingCaches.crop.set(cropKey, source)
+    const { requestId, sourceId: _sourceId, type: _type, protocol: _protocol, ...settings } = message
+    const localCrop = {
+      ...message.crop,
+      x: message.crop.x - envelope.originX,
+      y: message.crop.y - envelope.originY,
+    }
+    const localGrid = message.grid
+      ? { ...message.grid, originX: message.grid.originX - envelope.originX, originY: message.grid.originY - envelope.originY }
+      : undefined
+    const response = processImage({ ...settings, sourceId: cropKey, source: { width: source.width, height: source.height, data: source.data }, crop: localCrop, grid: localGrid, sourceFile: undefined }, processingCaches)
     self.postMessage({ type: 'process-result', protocol: 1, requestId, result: response.result, durationMs: response.durationMs }, [response.result.data.buffer])
   } catch (error) {
     self.postMessage({ type: 'error', protocol: 1, requestId: message.requestId, code: 'PROCESSING_FAILED', message: error instanceof Error ? error.message : '图像处理失败' })

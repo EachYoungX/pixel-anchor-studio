@@ -1,4 +1,4 @@
-import type { WorkerSourceBackend, WorkerSourceInput } from '@/workers/source-backends/source-backend'
+import { cropEnvelope, type CropRect, type SourceCrop, type SourceDimensions, type WorkerSourceBackend, type WorkerSourceInput } from '@/workers/source-backends/source-backend'
 
 export class BitmapSourceBackend implements WorkerSourceBackend {
   private readonly sources = new Map<string, ImageBitmap>()
@@ -14,15 +14,22 @@ export class BitmapSourceBackend implements WorkerSourceBackend {
     this.sources.set(sourceId, bitmap)
   }
 
-  readSource(sourceId: string): { width: number; height: number; data: Uint8ClampedArray } {
+  getDimensions(sourceId: string): SourceDimensions {
     const bitmap = this.sources.get(sourceId)
     if (!bitmap) throw new Error('源图缓存不存在，请重新导入图片')
-    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height)
+    return { width: bitmap.width, height: bitmap.height }
+  }
+
+  readCrop(sourceId: string, crop: CropRect): SourceCrop {
+    const bitmap = this.sources.get(sourceId)
+    if (!bitmap) throw new Error('源图缓存不存在，请重新导入图片')
+    const envelope = cropEnvelope(crop, bitmap)
+    const canvas = new OffscreenCanvas(envelope.width, envelope.height)
     const context = canvas.getContext('2d', { willReadFrequently: true })
     if (!context) throw new Error('Worker无法创建图像画布')
-    context.drawImage(bitmap, 0, 0)
-    const imageData = context.getImageData(0, 0, bitmap.width, bitmap.height)
-    return { width: bitmap.width, height: bitmap.height, data: imageData.data }
+    context.drawImage(bitmap, envelope.originX, envelope.originY, envelope.width, envelope.height, 0, 0, envelope.width, envelope.height)
+    const imageData = context.getImageData(0, 0, envelope.width, envelope.height)
+    return { ...envelope, data: imageData.data }
   }
 
   release(sourceId: string): void {

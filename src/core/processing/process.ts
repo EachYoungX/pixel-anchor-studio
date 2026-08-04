@@ -1,12 +1,14 @@
 import { cleanupSmallRegions } from '@/core/processing/cleanup'
 import { quantizeImage } from '@/core/processing/quantization'
 import { sampleImage } from '@/core/processing/sampling'
-import { LruCache } from '@/domain/cache/lru-cache'
+import { ByteLruCache, LruCache } from '@/domain/cache/lru-cache'
 import { PROCESS_CACHE_LIMITS } from '@/domain/cache/cache-budget'
 import { createFinalFingerprint, createQuantizedFingerprint, createSamplingFingerprint } from '@/domain/processing/process-fingerprint'
 import type { ProcessRequest, ProcessResponse } from '@/types/project'
+import type { SourceCrop } from '@/workers/source-backends/source-backend'
 
 export interface ProcessingCaches {
+  crop: ByteLruCache<string, SourceCrop>
   sampling: LruCache<string, Uint8ClampedArray>
   quantized: LruCache<string, Uint8ClampedArray>
   final: LruCache<string, Uint8ClampedArray>
@@ -14,6 +16,7 @@ export interface ProcessingCaches {
 
 export function createProcessingCaches(): ProcessingCaches {
   return {
+    crop: new ByteLruCache(PROCESS_CACHE_LIMITS.cropBytes, (value) => value.data.byteLength),
     sampling: new LruCache(PROCESS_CACHE_LIMITS.samplingEntries),
     quantized: new LruCache(PROCESS_CACHE_LIMITS.quantizedEntries),
     final: new LruCache(PROCESS_CACHE_LIMITS.finalEntries),
