@@ -2,6 +2,8 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useProjectStore } from '@/stores/project'
 import { useViewportController } from '@/composables/useViewportController'
+import { useCanvasGestures } from '@/composables/useCanvasGestures'
+import { useRafDraw } from '@/composables/useRafDraw'
 import type { Rect } from '@/types/project'
 
 const store = useProjectStore()
@@ -9,7 +11,6 @@ const host = ref<HTMLDivElement | null>(null)
 const tools = ref<HTMLDivElement | null>(null)
 const canvas = ref<HTMLCanvasElement | null>(null)
 const showGrid = ref(true)
-const isPointerInside = ref(false)
 let observer: ResizeObserver | null = null
 let canvasCssSize = { width: 320, height: 400 }
 
@@ -34,9 +35,17 @@ interface DragState {
 let view: ViewTransform = { scale: 1, offsetX: 0, offsetY: 0 }
 const viewport = useViewportController({ initialZoom: 1, minZoom: 0.25, maxZoom: 16 })
 let drag: DragState | null = null
-let spacePressed = false
 
 const activeRect = computed(() => (store.editTarget === 'anchor' ? store.anchor : store.effectiveCrop))
+
+function baseFitScale(): number {
+  if (!store.source) return 1
+  const padding = 24
+  return Math.min(
+    (canvasCssSize.width - padding * 2) / store.source.width,
+    (canvasCssSize.height - padding * 2) / store.source.height,
+  )
+}
 
 function resizeCanvas(): void {
   if (!host.value || !canvas.value) return
@@ -55,11 +64,7 @@ function resizeCanvas(): void {
 
 function calculateView(): ViewTransform {
   if (!canvas.value || !store.source) return { scale: 1, offsetX: 0, offsetY: 0 }
-  const padding = 24
-  const fitScale = Math.min(
-    (canvasCssSize.width - padding * 2) / store.source.width,
-    (canvasCssSize.height - padding * 2) / store.source.height,
-  )
+  const fitScale = baseFitScale()
   return {
     scale: fitScale * viewport.zoom.value,
     offsetX: (canvasCssSize.width - store.source.width * fitScale) / 2 + viewport.panX.value,
@@ -69,25 +74,7 @@ function calculateView(): ViewTransform {
 
 function resetViewport(): void {
   viewport.resetView()
-  draw()
-}
-
-function onWheel(event: WheelEvent): void {
-  if (!event.ctrlKey && !event.metaKey) return
-  event.preventDefault()
-  if (!canvas.value || !store.source) return
-  const bounds = canvas.value.getBoundingClientRect()
-  const point = { x: event.clientX - bounds.left, y: event.clientY - bounds.top }
-  const sourceX = (point.x - view.offsetX) / view.scale
-  const sourceY = (point.y - view.offsetY) / view.scale
-  const fitScale = view.scale / viewport.zoom.value
-  const nextZoom = Math.max(0.25, Math.min(16, viewport.zoom.value * Math.exp(-event.deltaY * 0.002)))
-  viewport.zoom.value = nextZoom
-  viewport.setManual()
-  const nextScale = fitScale * nextZoom
-  viewport.panX.value = point.x - sourceX * nextScale - (canvasCssSize.width - store.source!.width * fitScale) / 2
-  viewport.panY.value = point.y - sourceY * nextScale - (canvasCssSize.height - store.source!.height * fitScale) / 2
-  draw()
+  scheduleDraw()
 }
 
 function toScreen(rect: Rect): Rect {
@@ -229,7 +216,7 @@ function draw(): void {
   }
 }
 
-function pointerPosition(event: PointerEvent): { x: number; y: number } {
+function pointerPosition(event: PointerEvent | WheelEvent): { x: number; y: number } {
   const rect = canvas.value!.getBoundingClientRect()
   return { x: event.clientX - rect.left, y: event.clientY - rect.top }
 }
@@ -254,14 +241,9 @@ function contains(point: { x: number; y: number }, rect: Rect): boolean {
   return point.x >= screen.x && point.x <= screen.x + screen.width && point.y >= screen.y && point.y <= screen.y + screen.height
 }
 
-function onPointerDown(event: PointerEvent): void {
+function onPrimaryPointerDown(event: PointerEvent): void {
   if (!store.source || !canvas.value) return
   const point = pointerPosition(event)
-  if (spacePressed || event.button === 1) {
-    drag = { action: 'pan', handle: null, startX: point.x, startY: point.y, startRect: { x: viewport.panX.value, y: viewport.panY.value, width: 0, height: 0 }, snapStepX: 1, snapStepY: 1, snapOriginX: 0, snapOriginY: 0 }
-    canvas.value.setPointerCapture(event.pointerId)
-    return
-  }
   const current = { ...activeRect.value }
   const handle = detectHandle(point, current)
   if (!handle && !contains(point, current)) return
@@ -313,13 +295,6 @@ function onPointerMove(event: PointerEvent): void {
   const point = pointerPosition(event)
   const dx = (point.x - drag.startX) / view.scale
   const dy = (point.y - drag.startY) / view.scale
-  if (drag.action === 'pan') {
-    viewport.panX.value = drag.startRect.x + (point.x - drag.startX)
-    viewport.panY.value = drag.startRect.y + (point.y - drag.startY)
-    viewport.setManual()
-    draw()
-    return
-  }
   let next: Rect
   if (drag.action === 'move') {
     next = { ...drag.startRect, x: drag.startRect.x + dx, y: drag.startRect.y + dy }
@@ -335,7 +310,7 @@ function onPointerMove(event: PointerEvent): void {
   }
   if (store.editTarget === 'anchor') store.updateAnchor(next)
   else store.updateCrop(next)
-  draw()
+  scheduleDraw()
 }
 
 function onPointerUp(event: PointerEvent): void {
@@ -343,9 +318,26 @@ function onPointerUp(event: PointerEvent): void {
   drag = null
 }
 
+const gestures = useCanvasGestures({
+  element: canvas,
+  viewport,
+  getLocalPoint: (event) => {
+    const point = pointerPosition(event)
+    const fitScale = baseFitScale()
+    return store.source
+      ? { x: point.x - (canvasCssSize.width - store.source.width * fitScale) / 2, y: point.y - (canvasCssSize.height - store.source.height * fitScale) / 2 }
+      : point
+  },
+  onPrimaryPointerDown,
+  onPrimaryPointerMove: onPointerMove,
+  onPrimaryPointerUp: onPointerUp,
+})
+
+const { scheduleDraw } = useRafDraw(draw)
+
 watch(
   () => [store.source, store.effectiveCrop.x, store.effectiveCrop.y, store.effectiveCrop.width, store.effectiveCrop.height, store.anchor.x, store.anchor.y, store.anchor.width, store.scale.mode, store.scale.offsetX, store.scale.offsetY, store.outputDimensions.width, store.outputDimensions.height, store.editTarget, showGrid.value],
-  () => nextTick(draw),
+  () => nextTick(scheduleDraw),
   { deep: false },
 )
 
@@ -353,24 +345,14 @@ onMounted(() => {
   observer = new ResizeObserver(resizeCanvas)
   if (host.value) observer.observe(host.value)
   resizeCanvas()
-  window.addEventListener('keydown', onKeyDown)
-  window.addEventListener('keyup', onKeyUp)
 })
 
-function onKeyDown(event: KeyboardEvent): void {
-  const canvasFocused = document.activeElement === canvas.value
-  if (!canvasFocused && !isPointerInside.value) return
-  const target = event.target as HTMLElement | null
-  if (target && ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName)) return
-  if (event.code === 'Space') { spacePressed = true; event.preventDefault() }
-  if ((event.ctrlKey || event.metaKey) && event.key === '0') { event.preventDefault(); resetViewport() }
-}
-
-function onKeyUp(event: KeyboardEvent): void {
-  if (event.code === 'Space') spacePressed = false
-}
-
 function onCanvasKeydown(event: KeyboardEvent): void {
+  if ((event.ctrlKey || event.metaKey) && event.key === '0') {
+    event.preventDefault()
+    resetViewport()
+    return
+  }
   if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return
   if (!store.source) return
   const step = event.shiftKey ? 10 : 1
@@ -386,27 +368,25 @@ function onCanvasKeydown(event: KeyboardEvent): void {
 
 onBeforeUnmount(() => {
   observer?.disconnect()
-  window.removeEventListener('keydown', onKeyDown)
-  window.removeEventListener('keyup', onKeyUp)
 })
 </script>
 
 <template>
   <div ref="host" class="source-canvas-host">
-    <div ref="tools" class="canvas-tools">
+    <div ref="tools" class="viewport-toolbar">
       <span>当前编辑：{{ store.editTarget === 'crop' ? '裁剪框' : '锚点框' }}</span>
-      <span class="canvas-actions"><button class="button button-small" type="button" @click="resetViewport">恢复视图</button><label><input v-model="showGrid" type="checkbox" /> 显示网格</label></span>
+      <span class="viewport-toolbar__actions"><button class="button button-small" type="button" @click="resetViewport">恢复视图</button><label class="grid-toggle"><input v-model="showGrid" type="checkbox" /> 显示网格</label></span>
     </div>
     <canvas
       ref="canvas"
       class="source-canvas"
-      @pointerdown="onPointerDown"
-      @pointermove="onPointerMove"
-      @pointerup="onPointerUp"
-      @pointercancel="onPointerUp"
-      @pointerenter="isPointerInside = true"
-      @pointerleave="isPointerInside = false; spacePressed = false"
-      @wheel="onWheel"
+      @pointerdown="gestures.onPointerDown"
+      @pointermove="gestures.onPointerMove"
+      @pointerup="gestures.onPointerUp"
+      @pointercancel="gestures.onPointerCancel"
+      @pointerenter="gestures.onPointerEnter"
+      @pointerleave="gestures.onPointerLeave"
+      @wheel="gestures.onWheel"
       @dblclick="resetViewport"
       tabindex="0"
       @keydown="onCanvasKeydown"
@@ -416,18 +396,6 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .source-canvas-host { position: relative; height: 100%; min-width: 0; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); background: #e9ebee; }
-.canvas-tools {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 7px 10px;
-  background: #ffffff;
-  border-bottom: 1px solid var(--border);
-  color: #60676f;
-  font-size: 12px;
-}
-.canvas-tools label { display: flex; align-items: center; gap: 5px; }
-.canvas-actions { display: flex; align-items: center; gap: 8px; }
+.viewport-toolbar > span:first-child { color: #60676f; font-size: 12px; }
 .source-canvas { width: 100%; display: block; touch-action: none; cursor: crosshair; }
 </style>
