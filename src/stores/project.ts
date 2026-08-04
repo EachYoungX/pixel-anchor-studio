@@ -1,6 +1,6 @@
 import { computed, markRaw, reactive, ref, toRaw, watch } from 'vue'
 import { defineStore } from 'pinia'
-import { hexToRgba, rgbaToHex } from '@/core/color'
+import { hexToRgba, rgbToHsl, rgbaToHex } from '@/core/color'
 import { calculateOutputDimensions } from '@/core/dimensions'
 import { loadHtmlImage, loadSourceFile, imageToImageData } from '@/core/image/load'
 import { buildPalette } from '@/core/palette'
@@ -143,7 +143,16 @@ export const useProjectStore = defineStore('project', () => {
     palette.value = [...built.entries].sort((a, b) => {
       if (paletteSort.value === 'code') return a.code.localeCompare(b.code)
       if (paletteSort.value === 'lightness') return (a.rgba[0] + a.rgba[1] + a.rgba[2]) - (b.rgba[0] + b.rgba[1] + b.rgba[2])
-      if (paletteSort.value === 'hue') return Math.atan2(a.rgba[1] - a.rgba[2], a.rgba[0] - a.rgba[1]) - Math.atan2(b.rgba[1] - b.rgba[2], b.rgba[0] - b.rgba[1])
+      if (paletteSort.value === 'hue') {
+        const colorA = rgbToHsl(a.rgba[0], a.rgba[1], a.rgba[2])
+        const colorB = rgbToHsl(b.rgba[0], b.rgba[1], b.rgba[2])
+        const grayA = colorA.saturation < 0.08
+        const grayB = colorB.saturation < 0.08
+        if (grayA !== grayB) return grayA ? 1 : -1
+        if (!grayA && colorA.hue !== colorB.hue) return colorA.hue - colorB.hue
+        if (colorA.saturation !== colorB.saturation) return colorB.saturation - colorA.saturation
+        return colorA.lightness - colorB.lightness
+      }
       return b.count - a.count
     })
     colorCodes.value = built.codeMap

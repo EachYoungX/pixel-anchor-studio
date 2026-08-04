@@ -43,6 +43,23 @@ export function readableTextColor(r: number, g: number, b: number): '#111111' | 
   return luminance > 145 ? '#111111' : '#FFFFFF'
 }
 
+export function rgbToHsl(r: number, g: number, b: number): { hue: number; saturation: number; lightness: number } {
+  const red = r / 255
+  const green = g / 255
+  const blue = b / 255
+  const max = Math.max(red, green, blue)
+  const min = Math.min(red, green, blue)
+  const lightness = (max + min) / 2
+  const delta = max - min
+  if (delta === 0) return { hue: 0, saturation: 0, lightness }
+  const saturation = delta / (1 - Math.abs(2 * lightness - 1))
+  let hue = 0
+  if (max === red) hue = ((green - blue) / delta) % 6
+  else if (max === green) hue = (blue - red) / delta + 2
+  else hue = (red - green) / delta + 4
+  return { hue: (hue * 60 + 360) % 360, saturation, lightness }
+}
+
 export function colorKey(r: number, g: number, b: number, a: number): string {
   return `${r},${g},${b},${a}`
 }

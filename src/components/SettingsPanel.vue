@@ -24,17 +24,6 @@ async function generate(): Promise<void> {
         <button class="button button-small" :class="{ 'button-active': store.cropSettings.mode === 'full' }" type="button" :disabled="!store.source" @click="store.useFullCrop">完整原图</button>
         <button class="button button-small" :class="{ 'button-active': store.cropSettings.mode === 'center-square' }" type="button" :disabled="!store.source" @click="store.useCenterSquareCrop">居中正方形</button>
       </div>
-      <div class="segmented">
-        <button
-          class="button button-small"
-          :class="{ 'button-active': store.editTarget === 'anchor' }"
-          type="button"
-          :disabled="!store.source"
-          @click="store.editTarget = 'anchor'"
-        >
-          编辑特征锚点
-        </button>
-      </div>
       <p class="help">当前使用：{{ store.cropSettings.mode === 'full' ? '完整原图' : store.cropSettings.mode === 'center-square' ? '居中正方形' : '自由裁剪' }}</p>
       <p class="help">在原图画布中拖动框体，拖动四角可调整范围。所有位置均按原图浮点坐标保存。</p>
     </section>
@@ -77,6 +66,7 @@ async function generate(): Promise<void> {
       </template>
 
       <template v-else-if="store.scale.mode === 'anchor'">
+        <button class="button button-small" :class="{ 'button-active': store.editTarget === 'anchor' }" type="button" :disabled="!store.source" @click="store.editTarget = 'anchor'">编辑特征锚点</button>
         <div class="field">
           <span class="field-label">锚点占格</span>
           <div class="anchor-options">
