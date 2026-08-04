@@ -1,0 +1,4 @@
+@media (max-width: 1180px) {
+  .workspace { grid-template-columns: 270px minmax(420px, 1fr); }
+  .workspace--bead { grid-template-columns: 270px minmax(420px, 1fr) 270px; }
+}

@@ -1,0 +1,24 @@
+:root {
+  --font-title: 22px;
+  --font-section: 16px;
+  --font-control: 13px;
+  --font-help: 12px;
+  --toolbar-height: 42px;
+  --panel-padding: 12px;
+  --panel-gap: 12px;
+  --side-width-min: 308px;
+  --side-width-max: 336px;
+  --radius-small: 6px;
+  --radius-medium: 9px;
+  --surface: #ffffff;
+  --surface-muted: #f7f8f9;
+  --border: #dfe2e6;
+  --border-strong: #c6cbd1;
+  --text: #202124;
+  --text-muted: #6b7280;
+  --muted: var(--text-muted);
+  --accent: #34495e;
+  --accent-soft: #eef2f5;
+  --danger: #a33a3a;
+  --radius: var(--radius-medium);
+}

@@ -5,16 +5,6 @@
   background: #f5f6f7;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  --border: #dfe2e6;
-  --border-strong: #c6cbd1;
-  --text: #202124;
-  --muted: #6b7280;
-  --surface: #ffffff;
-  --surface-muted: #f7f8f9;
-  --accent: #34495e;
-  --accent-soft: #eef2f5;
-  --danger: #a33a3a;
-  --radius: 9px;
 }
 
 * { box-sizing: border-box; }

@@ -1,0 +1,2 @@
+.view-action { min-height: 32px; padding: 5px 9px; }
+.grid-toggle { display: flex; align-items: center; gap: 5px; color: var(--text-muted); font-size: var(--font-help); white-space: nowrap; }
