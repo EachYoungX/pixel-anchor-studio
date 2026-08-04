@@ -1,4 +1,4 @@
-import { colorDistanceSquared, colorKey } from '@/core/color'
+import { colorDistanceSquared } from '@/core/color'
 import type { CleanupStrength } from '@/types/project'
 
 function thresholdForStrength(strength: CleanupStrength): number {
@@ -16,20 +16,37 @@ function dataOffset(index: number): number {
   return index * 4
 }
 
-function getKey(data: Uint8ClampedArray, index: number): string {
+function getKey(data: Uint8ClampedArray, index: number): number {
   const offset = dataOffset(index)
-  return colorKey(data[offset], data[offset + 1], data[offset + 2], data[offset + 3])
+  return (((data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3]) >>> 0)
 }
 
-function neighbors(width: number, height: number, index: number): number[] {
-  const x = index % width
-  const y = Math.floor(index / width)
-  const result: number[] = []
-  if (x > 0) result.push(pixelIndex(width, x - 1, y))
-  if (x + 1 < width) result.push(pixelIndex(width, x + 1, y))
-  if (y > 0) result.push(pixelIndex(width, x, y - 1))
-  if (y + 1 < height) result.push(pixelIndex(width, x, y + 1))
-  return result
+function inspectNeighbor(
+  output: Uint8ClampedArray,
+  targetKey: number,
+  neighbor: number,
+  visited: Uint8Array,
+  queue: Int32Array,
+  queueEnd: number,
+  boundary: Map<number, { count: number; rgba: [number, number, number, number] }>,
+): number {
+  const neighborKey = getKey(output, neighbor)
+  if (neighborKey === targetKey) {
+    if (!visited[neighbor]) {
+      visited[neighbor] = 1
+      queue[queueEnd] = neighbor
+      return queueEnd + 1
+    }
+    return queueEnd
+  }
+  const offset = dataOffset(neighbor)
+  const entry = boundary.get(neighborKey) ?? {
+    count: 0,
+    rgba: [output[offset], output[offset + 1], output[offset + 2], output[offset + 3]],
+  }
+  entry.count += 1
+  boundary.set(neighborKey, entry)
+  return queueEnd
 }
 
 export function cleanupSmallRegions(
@@ -43,38 +60,31 @@ export function cleanupSmallRegions(
 
   const output = new Uint8ClampedArray(data)
   const visited = new Uint8Array(width * height)
+  const component = new Int32Array(width * height)
+  const queue = new Int32Array(width * height)
 
   for (let start = 0; start < width * height; start += 1) {
     if (visited[start]) continue
     visited[start] = 1
     const targetKey = getKey(output, start)
-    const component: number[] = []
-    const queue = [start]
-    const boundary = new Map<string, { count: number; rgba: [number, number, number, number] }>()
+    let componentLength = 0
+    let queueStart = 0
+    let queueEnd = 0
+    queue[queueEnd++] = start
+    const boundary = new Map<number, { count: number; rgba: [number, number, number, number] }>()
 
-    while (queue.length > 0) {
-      const current = queue.pop()!
-      component.push(current)
-      for (const neighbor of neighbors(width, height, current)) {
-        const neighborKey = getKey(output, neighbor)
-        if (neighborKey === targetKey) {
-          if (!visited[neighbor]) {
-            visited[neighbor] = 1
-            queue.push(neighbor)
-          }
-        } else {
-          const offset = dataOffset(neighbor)
-          const entry = boundary.get(neighborKey) ?? {
-            count: 0,
-            rgba: [output[offset], output[offset + 1], output[offset + 2], output[offset + 3]],
-          }
-          entry.count += 1
-          boundary.set(neighborKey, entry)
-        }
-      }
+    while (queueStart < queueEnd) {
+      const current = queue[queueStart++]
+      component[componentLength++] = current
+      const x = current % width
+      const y = Math.floor(current / width)
+      if (x > 0) queueEnd = inspectNeighbor(output, targetKey, current - 1, visited, queue, queueEnd, boundary)
+      if (x + 1 < width) queueEnd = inspectNeighbor(output, targetKey, current + 1, visited, queue, queueEnd, boundary)
+      if (y > 0) queueEnd = inspectNeighbor(output, targetKey, current - width, visited, queue, queueEnd, boundary)
+      if (y + 1 < height) queueEnd = inspectNeighbor(output, targetKey, current + width, visited, queue, queueEnd, boundary)
     }
 
-    if (component.length > threshold || boundary.size === 0) continue
+    if (componentLength > threshold || boundary.size === 0) continue
     const sourceOffset = dataOffset(component[0])
     const source = [
       output[sourceOffset],
@@ -92,7 +102,8 @@ export function cleanupSmallRegions(
       )
     })[0].rgba
 
-    for (const index of component) {
+    for (let componentIndex = 0; componentIndex < componentLength; componentIndex += 1) {
+      const index = component[componentIndex]
       const offset = dataOffset(index)
       output[offset] = replacement[0]
       output[offset + 1] = replacement[1]
