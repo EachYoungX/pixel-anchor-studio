@@ -22,12 +22,14 @@ function boundsForCell(request: ProcessRequest, targetX: number, targetY: number
   const originY = request.grid?.originY ?? crop.y + scaleOffset.y * cellSize
   const shiftedX = originX + targetX * cellSize
   const shiftedY = originY + targetY * cellSize
+  const cropRight = Math.min(source.width, crop.x + crop.width)
+  const cropBottom = Math.min(source.height, crop.y + crop.height)
 
   return {
-    x0: clamp(shiftedX, 0, source.width - 1),
-    y0: clamp(shiftedY, 0, source.height - 1),
-    x1: clamp(shiftedX + cellSize, 0, source.width),
-    y1: clamp(shiftedY + cellSize, 0, source.height),
+    x0: clamp(shiftedX, crop.x, cropRight),
+    y0: clamp(shiftedY, crop.y, cropBottom),
+    x1: clamp(shiftedX + cellSize, crop.x, cropRight),
+    y1: clamp(shiftedY + cellSize, crop.y, cropBottom),
   }
 }
 
