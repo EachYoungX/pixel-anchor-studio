@@ -330,6 +330,20 @@ function onKeyUp(event: KeyboardEvent): void {
   if (event.code === 'Space') spacePressed = false
 }
 
+function onCanvasKeydown(event: KeyboardEvent): void {
+  if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return
+  if (!store.source) return
+  const step = event.shiftKey ? 10 : 1
+  const next = { ...activeRect.value }
+  if (event.key === 'ArrowLeft') next.x -= step
+  if (event.key === 'ArrowRight') next.x += step
+  if (event.key === 'ArrowUp') next.y -= step
+  if (event.key === 'ArrowDown') next.y += step
+  event.preventDefault()
+  if (store.editTarget === 'anchor') store.updateAnchor(next)
+  else store.updateCrop(next)
+}
+
 onBeforeUnmount(() => {
   observer?.disconnect()
   host.value?.removeEventListener('wheel', onWheel)
@@ -352,6 +366,8 @@ onBeforeUnmount(() => {
       @pointerup="onPointerUp"
       @pointercancel="onPointerUp"
       @dblclick="resetViewport"
+      tabindex="0"
+      @keydown="onCanvasKeydown"
     />
   </div>
 </template>
