@@ -1,39 +1,79 @@
 /// <reference lib="webworker" />
 
-import { processImage } from '@/core/processing/process'
+import { createProcessingCaches, processImage } from '@/core/processing/process'
 import type { ProcessRequest } from '@/types/project'
+import { BitmapSourceBackend } from '@/workers/source-backends/bitmap-source-backend'
+import { RgbaSourceBackend } from '@/workers/source-backends/rgba-source-backend'
+import type { WorkerSourceInput } from '@/workers/source-backends/source-backend'
 
 declare const self: DedicatedWorkerGlobalScope
 
 type WorkerRequest =
-  | { type: 'load-source'; sourceId: string; width: number; height: number; data: Uint8ClampedArray }
-  | { type: 'release-source'; sourceId: string }
-  | ({ type: 'process'; sourceId: string; requestId: number } & Omit<ProcessRequest, 'source'>)
+  | { type: 'load-source'; protocol: 1; sourceId: string; source: WorkerSourceInput }
+  | { type: 'release-source'; protocol: 1; sourceId: string }
+  | { type: 'clear'; protocol: 1 }
+  | ({ type: 'process'; protocol: 1; sourceId: string; requestId: number } & Omit<ProcessRequest, 'source' | 'sourceFile'>)
 
-const sources = new Map<string, ProcessRequest['source']>()
+const bitmapBackend = new BitmapSourceBackend()
+const rgbaBackend = new RgbaSourceBackend()
+const sourceBackends = new Map<string, 'bitmap' | 'rgba'>()
+const processingCaches = createProcessingCaches()
 
-self.onmessage = (event: MessageEvent<WorkerRequest>) => {
+self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
   const message = event.data
+  if (message.protocol !== 1) {
+    self.postMessage({ type: 'error', protocol: 1, code: 'WORKER_PROTOCOL_MISMATCH', message: 'Worker协议版本不匹配' })
+    return
+  }
   if (message.type === 'load-source') {
-    sources.set(message.sourceId, { width: message.width, height: message.height, data: message.data })
+    try {
+      if (message.source.blob && bitmapBackend.supported) {
+        try {
+          await bitmapBackend.load(message.sourceId, message.source)
+          sourceBackends.set(message.sourceId, 'bitmap')
+        } catch {
+          if (!message.source.data) throw new Error('无法解码原图')
+          await rgbaBackend.load(message.sourceId, message.source)
+          sourceBackends.set(message.sourceId, 'rgba')
+        }
+      } else {
+        await rgbaBackend.load(message.sourceId, message.source)
+        sourceBackends.set(message.sourceId, 'rgba')
+      }
+      self.postMessage({ type: 'source-loaded', protocol: 1, sourceId: message.sourceId, backend: sourceBackends.get(message.sourceId) })
+    } catch (error) {
+      self.postMessage({ type: 'error', protocol: 1, sourceId: message.sourceId, code: 'SOURCE_DECODE_FAILED', message: error instanceof Error ? error.message : '无法解码原图' })
+    }
     return
   }
   if (message.type === 'release-source') {
-    sources.delete(message.sourceId)
+    bitmapBackend.release(message.sourceId)
+    rgbaBackend.release(message.sourceId)
+    sourceBackends.delete(message.sourceId)
+    processingCaches.sampling.clear()
+    processingCaches.quantized.clear()
+    processingCaches.final.clear()
     return
   }
-  const { requestId, sourceId, type: _type, ...settings } = message
-  const source = sources.get(sourceId)
-  if (!source) {
-    self.postMessage({ requestId, error: '源图缓存不存在，请重新导入图片' })
+  if (message.type === 'clear') {
+    bitmapBackend.clear()
+    rgbaBackend.clear()
+    sourceBackends.clear()
+    processingCaches.sampling.clear()
+    processingCaches.quantized.clear()
+    processingCaches.final.clear()
     return
   }
+
   try {
-    const response = processImage({ ...settings, source })
-    self.postMessage({ ...response, requestId }, [response.result.data.buffer])
+    const backend = sourceBackends.get(message.sourceId)
+    if (!backend) throw new Error('源图缓存不存在，请重新导入图片')
+    const source = backend === 'bitmap' ? bitmapBackend.readSource(message.sourceId) : rgbaBackend.readSource(message.sourceId)
+    const { requestId, sourceId, type: _type, protocol: _protocol, ...settings } = message
+    const response = processImage({ ...settings, source, sourceId }, processingCaches)
+    self.postMessage({ type: 'process-result', protocol: 1, requestId, result: response.result, durationMs: response.durationMs }, [response.result.data.buffer])
   } catch (error) {
-    const message = error instanceof Error ? error.message : '图像处理失败'
-    self.postMessage({ requestId, error: message })
+    self.postMessage({ type: 'error', protocol: 1, requestId: message.requestId, code: 'PROCESSING_FAILED', message: error instanceof Error ? error.message : '图像处理失败' })
   }
 }
 

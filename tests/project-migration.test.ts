@@ -21,7 +21,7 @@ describe('migrateProject', () => {
       bead: { pageColumns: 64, pageRows: 64 },
     })
 
-    expect(project.version).toBe(3)
+    expect(project.version).toBe(4)
     expect(project.scale.directLongSide).toBe(96)
     expect(project.scale).not.toHaveProperty('directAxis')
     expect(project.scale).not.toHaveProperty('snapToGrid')

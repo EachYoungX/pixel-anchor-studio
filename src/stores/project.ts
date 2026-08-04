@@ -2,11 +2,12 @@ import { computed, markRaw, reactive, ref, toRaw, watch } from 'vue'
 import { defineStore } from 'pinia'
 import { hexToRgba, rgbToHsl, rgbaToHex } from '@/core/color'
 import { calculateOutputDimensions } from '@/core/dimensions'
-import { imageToDataUrl, imageToImageData, loadHtmlImage, loadSourceFile } from '@/core/image/load'
 import { buildPalette } from '@/core/palette'
 import { mergeSimilarColors } from '@/core/processing/palette-merge'
 import { base64ToBytes, bytesToBase64 } from '@/core/export/project'
-import { releaseProcessingSource, runProcessing } from '@/core/worker-client'
+import { ProcessingService } from '@/domain/processing/processing-service'
+import { SourceSession } from '@/domain/source/source-session'
+import { defaultBead, defaultProcessing, defaultScale, defaultSnapSettings } from '@/domain/project/defaults'
 import type {
   BeadSettings,
   CropMode,
@@ -25,40 +26,6 @@ import type {
   ScaleMode,
   SnapSettings,
 } from '@/types/project'
-
-const defaultSnapSettings = (): SnapSettings => ({
-  direct: 'source-pixel',
-  anchor: 'source-pixel',
-  pseudo: 'target-cell',
-})
-
-const defaultScale = (): ScaleSettings => ({
-  mode: 'direct',
-  directLongSide: 32,
-  anchorCells: 3,
-  pseudoCellSize: 8,
-  offsetX: 0,
-  offsetY: 0,
-  snapMode: 'source-pixel',
-  snapSettings: defaultSnapSettings(),
-})
-
-const defaultProcessing = (): ProcessingSettings => ({
-  sampling: 'median',
-  quantize: true,
-  maxColors: 64,
-  cleanup: 'off',
-  preserveAlpha: true,
-  transparentThreshold: 24,
-})
-
-const defaultBead = (): BeadSettings => ({
-  maxColors: 64,
-  cellSize: 24,
-  pageColumns: 32,
-  pageRows: 32,
-  indexFromOne: true,
-})
 
 function clampRect(rect: Rect, width: number, height: number, minimum = 4): Rect {
   const result = { ...rect }
@@ -112,17 +79,22 @@ export const useProjectStore = defineStore('project', () => {
   let latestProcessId = 0
   let sourceRevision = 0
   const sourceId = ref('source-0')
-  let cachedProcessKey = ''
-  let cachedProcessResult: PixelResult | null = null
+  let generatedResultRevision = 0
+  const processingService = new ProcessingService()
+  const sourceSession = new SourceSession()
+  interface PixelEditTransaction {
+    label: string
+    before: PixelResult
+    dirty: { minX: number; minY: number; maxX: number; maxY: number } | null
+  }
+  let pixelEditTransaction: PixelEditTransaction | null = null
 
   function releaseCurrentSource(): void {
     latestProcessId += 1
     sourceRevision += 1
-    releaseProcessingSource(sourceId.value)
-    if (source.value?.previewUrl?.startsWith('blob:')) URL.revokeObjectURL(source.value.previewUrl)
+    processingService.releaseSource(sourceId.value)
+    sourceSession.release()
     sourceId.value = `source-${sourceRevision}`
-    cachedProcessKey = ''
-    cachedProcessResult = null
     source.value = null
     sourceImage.value = null
     sourceImageData.value = null
@@ -144,7 +116,7 @@ export const useProjectStore = defineStore('project', () => {
     return crop
   })
   const outputDimensions = computed(() => calculateOutputDimensions(effectiveCrop.value, anchor, scale))
-  const canProcess = computed(() => Boolean(source.value && sourceImageData.value))
+  const canProcess = computed(() => Boolean(source.value && (source.value.file || sourceImageData.value)))
   const beadCount = computed(() => palette.value.reduce((total, entry) => total + entry.count, 0))
   const canExportBead = computed(() => Boolean(result.value && palette.value.length > 0 && palette.value.length <= bead.maxColors))
   const sourceLabel = computed(() => {
@@ -177,12 +149,16 @@ export const useProjectStore = defineStore('project', () => {
 
   watch(paletteSort, refreshPalette)
 
+  function invalidateGeneratedResult(_reason: 'source' | 'crop' | 'scale' | 'processing' | 'manual-edit'): void {
+    generatedResultRevision += 1
+  }
+
   async function importImage(file: File): Promise<void> {
     releaseCurrentSource()
-    const loaded = await loadSourceFile(file)
+    const loaded = await sourceSession.openFile(file)
     source.value = loaded.source
     sourceImage.value = markRaw(loaded.image)
-    sourceImageData.value = markRaw(imageToImageData(loaded.image))
+    sourceImageData.value = null
     Object.assign(crop, { x: 0, y: 0, width: loaded.source.width, height: loaded.source.height })
     cropSettings.mode = 'custom'
     const anchorSide = Math.max(8, Math.min(loaded.source.width, loaded.source.height) * 0.12)
@@ -193,11 +169,13 @@ export const useProjectStore = defineStore('project', () => {
       height: anchorSide,
     })
     result.value = null
+    invalidateGeneratedResult('source')
     palette.value = []
     history.value = []
     future.value = []
     colorCodes.value = {}
-    status.value = '图片已导入，调整裁剪和转换参数后生成预览'
+    const memoryHint = loaded.estimatedRgbaBytes >= 120 * 1024 * 1024 ? ' 图片较大，处理将交给后台并可能需要更多时间。' : ''
+    status.value = `图片已导入，调整裁剪和转换参数后生成预览。${memoryHint}`
   }
 
   function updateCrop(next: Rect): void {
@@ -248,32 +226,21 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   async function process(): Promise<void> {
-    if (!sourceImageData.value || !source.value) return
+    if (!source.value || (!source.value.file && !sourceImageData.value)) return
     const processId = ++latestProcessId
     isProcessing.value = true
     status.value = '正在生成像素矩阵'
     try {
       const dimensions = outputDimensions.value
-      const processKey = JSON.stringify({
-        sourceRevision,
-        crop: effectiveCrop.value,
-        anchor,
-        scale,
-        processing,
-      })
-      if (cachedProcessKey === processKey && cachedProcessResult) {
-        result.value = markRaw(cloneResult(cachedProcessResult))
-        refreshPalette()
-        status.value = `已复用 ${result.value.width} × ${result.value.height} 生成结果，${palette.value.length} 色`
-        return
-      }
-      const response = await runProcessing({
+      const sourceData = sourceImageData.value?.data ?? new Uint8ClampedArray()
+      const response = await processingService.process({
         sourceId: sourceId.value,
         source: {
-          width: sourceImageData.value.width,
-          height: sourceImageData.value.height,
-          data: sourceImageData.value.data,
+          width: source.value.width,
+          height: source.value.height,
+          data: sourceData,
         },
+        sourceFile: source.value.file,
         crop: { ...toRaw(effectiveCrop.value) },
         output: { width: dimensions.width, height: dimensions.height },
         grid: {
@@ -286,8 +253,6 @@ export const useProjectStore = defineStore('project', () => {
       }, sourceId.value)
       if (processId !== latestProcessId) return
       result.value = markRaw(response.result)
-      cachedProcessKey = processKey
-      cachedProcessResult = cloneResult(response.result)
       lastDurationMs.value = response.durationMs
       history.value = []
       future.value = []
@@ -316,13 +281,53 @@ export const useProjectStore = defineStore('project', () => {
     const offset = (y * result.value.width + x) * 4
     if (rgba.every((value, index) => value === result.value!.data[offset + index])) return
     if (record) pushHistory(label)
-    cachedProcessKey = ''
-    cachedProcessResult = null
+    else if (pixelEditTransaction && !pixelEditTransaction.dirty) {
+      history.value.push({ label: pixelEditTransaction.label, result: cloneResult(pixelEditTransaction.before) })
+      if (history.value.length > 20) history.value.shift()
+      future.value = []
+    }
+    invalidateGeneratedResult('manual-edit')
     result.value.data[offset] = rgba[0]
     result.value.data[offset + 1] = rgba[1]
     result.value.data[offset + 2] = rgba[2]
     result.value.data[offset + 3] = rgba[3]
-    refreshPalette()
+    if (pixelEditTransaction) {
+      const dirty = pixelEditTransaction.dirty ?? { minX: x, minY: y, maxX: x, maxY: y }
+      dirty.minX = Math.min(dirty.minX, x)
+      dirty.minY = Math.min(dirty.minY, y)
+      dirty.maxX = Math.max(dirty.maxX, x)
+      dirty.maxY = Math.max(dirty.maxY, y)
+      pixelEditTransaction.dirty = dirty
+    } else {
+      refreshPalette()
+    }
+  }
+
+  function beginPixelEdit(label: string): void {
+    if (!result.value || pixelEditTransaction) return
+    pixelEditTransaction = { label, before: cloneResult(result.value), dirty: null }
+  }
+
+  function endPixelEdit(): void {
+    if (!pixelEditTransaction) return
+    if (pixelEditTransaction.dirty) refreshPalette()
+    pixelEditTransaction = null
+  }
+
+  function cancelPixelEdit(): void {
+    if (!pixelEditTransaction || !result.value) return
+    const transaction = pixelEditTransaction
+    if (transaction.dirty) {
+      result.value = markRaw(transaction.before)
+      const last = history.value[history.value.length - 1]
+      if (last?.label === transaction.label) history.value.pop()
+      refreshPalette()
+    }
+    pixelEditTransaction = null
+  }
+
+  function applyPixelChange(x: number, y: number, color: string): void {
+    setPixel(x, y, color, false)
   }
 
   function pickPixel(x: number, y: number): void {
@@ -352,8 +357,7 @@ export const useProjectStore = defineStore('project', () => {
     const replacement = hexToRgba(selectedColor.value)
     if (target.every((value, index) => value === replacement[index])) return
     pushHistory('填充')
-    cachedProcessKey = ''
-    cachedProcessResult = null
+    invalidateGeneratedResult('manual-edit')
     const visited = new Uint8Array(width * height)
     const queue = [start]
     while (queue.length > 0) {
@@ -398,8 +402,7 @@ export const useProjectStore = defineStore('project', () => {
     }
     if (!changed) return
     pushHistory('合并颜色')
-    cachedProcessKey = ''
-    cachedProcessResult = null
+    invalidateGeneratedResult('manual-edit')
     for (let offset = 0; offset < result.value.data.length; offset += 4) {
       if (
         result.value.data[offset] === from[0] &&
@@ -419,8 +422,7 @@ export const useProjectStore = defineStore('project', () => {
       return
     }
     pushHistory('合并相近色')
-    cachedProcessKey = ''
-    cachedProcessResult = null
+    invalidateGeneratedResult('manual-edit')
     result.value = markRaw(merged.result)
     refreshPalette()
     status.value = merged.before === merged.after ? '没有找到符合条件的相近色' : `已合并相近色：${merged.before} 色 → ${merged.after} 色`
@@ -431,8 +433,7 @@ export const useProjectStore = defineStore('project', () => {
     const previous = history.value.pop()!
     future.value.push({ label: previous.label, result: cloneResult(result.value) })
     result.value = markRaw(previous.result)
-    cachedProcessKey = ''
-    cachedProcessResult = null
+    invalidateGeneratedResult('manual-edit')
     refreshPalette()
   }
 
@@ -441,22 +442,32 @@ export const useProjectStore = defineStore('project', () => {
     const next = future.value.pop()!
     history.value.push({ label: next.label, result: cloneResult(result.value) })
     result.value = markRaw(next.result)
-    cachedProcessKey = ''
-    cachedProcessResult = null
+    invalidateGeneratedResult('manual-edit')
     refreshPalette()
   }
 
-  function serialize(): SerializedProject {
+  async function serialize(): Promise<SerializedProject> {
+    let sourceDataBase64 = ''
+    let sourceMime = 'image/png'
+    if (source.value?.file) {
+      sourceDataBase64 = bytesToBase64(new Uint8ClampedArray(await source.value.file.arrayBuffer()))
+      sourceMime = source.value.file.type || sourceMime
+    } else if (source.value?.dataUrl) {
+      const parts = source.value.dataUrl.split(',', 2)
+      sourceDataBase64 = parts[1] ?? ''
+      sourceMime = /^data:([^;,]+)/.exec(source.value.dataUrl)?.[1] ?? sourceMime
+    }
     return {
       format: 'pixel-anchor-project',
-      version: 3,
+      version: 4,
       savedAt: new Date().toISOString(),
       source: source.value
         ? {
             name: source.value.name,
-            dataUrl: source.value.dataUrl || (sourceImage.value ? imageToDataUrl(sourceImage.value) : ''),
+            mime: sourceMime,
             width: source.value.width,
             height: source.value.height,
+            dataBase64: sourceDataBase64,
           }
         : null,
       crop: { ...toRaw(crop) },
@@ -475,10 +486,14 @@ export const useProjectStore = defineStore('project', () => {
   async function loadSerialized(project: SerializedProject): Promise<void> {
     releaseCurrentSource()
     if (project.source) {
-      const image = await loadHtmlImage(project.source.dataUrl)
-      source.value = { ...project.source }
-      sourceImage.value = markRaw(image)
-      sourceImageData.value = markRaw(imageToImageData(image))
+      const bytes = base64ToBytes(project.source.dataBase64)
+      const rawBytes = new ArrayBuffer(bytes.byteLength)
+      new Uint8Array(rawBytes).set(bytes)
+      const blob = new Blob([rawBytes], { type: project.source.mime || 'image/png' })
+      const loaded = await sourceSession.openBlob({ name: project.source.name, mime: project.source.mime, width: project.source.width, height: project.source.height, blob })
+      source.value = loaded.source
+      sourceImage.value = markRaw(loaded.image)
+      sourceImageData.value = null
     } else {
       source.value = null
       sourceImage.value = null
@@ -546,6 +561,10 @@ export const useProjectStore = defineStore('project', () => {
     resetGridPhase,
     process,
     applyTool,
+    beginPixelEdit,
+    applyPixelChange,
+    endPixelEdit,
+    cancelPixelEdit,
     mergeColor,
     mergeSimilar,
     undo,

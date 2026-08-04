@@ -46,8 +46,12 @@ async function handleProject(event: Event): Promise<void> {
   }
 }
 
-function saveProject(): void {
-  exportProjectFile(store.serialize(), `${baseName()}.pixel-anchor.json`)
+async function saveProject(): Promise<void> {
+  try {
+    exportProjectFile(await store.serialize(), `${baseName()}.pixel-anchor.json`)
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '项目保存失败')
+  }
 }
 
 async function savePng(scale: number): Promise<void> {

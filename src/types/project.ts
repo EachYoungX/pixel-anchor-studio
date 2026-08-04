@@ -31,8 +31,17 @@ export interface SourceState {
   name: string
   dataUrl: string
   previewUrl?: string
+  file?: Blob
   width: number
   height: number
+}
+
+export interface SerializedSourceV4 {
+  name: string
+  mime: string
+  width: number
+  height: number
+  dataBase64: string
 }
 
 export interface ScaleSettings {
@@ -89,9 +98,9 @@ export interface SerializedPixelResult {
 
 export interface SerializedProject {
   format: 'pixel-anchor-project'
-  version: 3
+  version: 4
   savedAt: string
-  source: SourceState | null
+  source: SerializedSourceV4 | null
   crop: Rect
   cropSettings?: CropSettings
   anchor: Rect
@@ -104,6 +113,7 @@ export interface SerializedProject {
 
 export interface ProcessRequest {
   sourceId?: string
+  sourceFile?: Blob
   source: {
     width: number
     height: number
