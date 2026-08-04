@@ -82,8 +82,8 @@ const store = useProjectStore()
   padding: 12px 14px;
   border-bottom: 1px solid var(--border);
 }
-.palette-header span { color: var(--muted); font-size: 11px; }
-.palette-sort { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center; padding: 10px 14px 0; color: var(--muted); font-size: 11px; }
+.palette-header span { color: var(--muted); font-size: 12px; }
+.palette-sort { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center; padding: 10px 14px 0; color: var(--muted); font-size: 12px; }
 .merge-controls { display: grid; grid-template-columns: 1fr auto; gap: 6px; margin-bottom: 8px; }
 .palette-body { padding: 10px; }
 .palette-help { padding: 2px 3px 10px; }
@@ -108,9 +108,9 @@ const store = useProjectStore()
   background-size: 10px 10px;
   background-position: 0 0, 0 5px, 5px -5px, -5px 0;
 }
-.palette-code { font-size: 12px; font-weight: 700; color: #343a40; }
+.palette-code { font-size: 13px; font-weight: 700; color: #343a40; }
 .palette-value { min-width: 0; display: grid; gap: 2px; }
-.palette-value strong { overflow: hidden; text-overflow: ellipsis; font-size: 11px; }
-.palette-value small { color: var(--muted); font-size: 10px; }
+.palette-value strong { overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
+.palette-value small { color: var(--muted); font-size: 11px; }
 .merge-button { padding-inline: 6px; }
 </style>

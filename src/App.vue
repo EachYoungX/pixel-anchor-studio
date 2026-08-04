@@ -20,8 +20,8 @@ useGlobalShortcuts()
   <div class="app-shell">
     <TopBar />
     <nav class="workspace-tabs" aria-label="工作区">
-      <button class="button button-small" :class="{ 'button-active': workspaceMode === 'pixel' }" type="button" @click="workspaceMode = 'pixel'">像素化与编辑</button>
-      <button class="button button-small" :class="{ 'button-active': workspaceMode === 'bead' }" type="button" :disabled="!store.result" @click="workspaceMode = 'bead'">拼豆图导出</button>
+      <button class="workspace-tab" :class="{ active: workspaceMode === 'pixel' }" type="button" @click="workspaceMode = 'pixel'">像素化与编辑</button>
+      <button class="workspace-tab" :class="{ active: workspaceMode === 'bead' }" type="button" :disabled="!store.result" @click="workspaceMode = 'bead'">拼豆图导出</button>
     </nav>
     <div class="workspace" :class="{ 'workspace--bead': workspaceMode === 'bead' }">
       <template v-if="workspaceMode === 'pixel'">
@@ -65,5 +65,7 @@ useGlobalShortcuts()
 </template>
 
 <style scoped>
-.workspace-tabs { display: flex; gap: 6px; padding: 8px 14px 0; background: #f5f6f7; }
+.workspace-tabs { min-height: 48px; display: flex; align-items: center; gap: 8px; padding: 6px 14px; background: #f5f6f7; }
+.workspace-tab { min-height: 38px; padding: 7px 16px; border: 1px solid var(--border-strong); border-radius: 8px; background: #fff; color: #30363c; font-size: 14px; font-weight: 600; }
+.workspace-tab.active { background: var(--accent-soft); border-color: #8e9ba7; color: var(--accent); }
 </style>

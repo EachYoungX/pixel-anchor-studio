@@ -51,7 +51,7 @@ function saveCsv(): void {
 <style scoped>
 .settings-section { display: grid; gap: 12px; padding: 14px; border-bottom: 1px solid var(--border); }
 .section-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.field { display: grid; gap: 6px; color: #3f454c; font-size: 12px; font-weight: 600; }
+.field { display: grid; gap: 6px; color: #3f454c; font-size: 13px; font-weight: 600; }
 .two-column { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .input { width: 100%; height: 33px; padding: 5px 8px; border: 1px solid var(--border-strong); border-radius: 7px; background: #fff; }
 .checkbox-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; }

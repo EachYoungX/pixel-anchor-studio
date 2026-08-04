@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useProjectStore } from '@/stores/project'
+import { useViewportController } from '@/composables/useViewportController'
 import type { Rect } from '@/types/project'
 
 const store = useProjectStore()
@@ -18,12 +19,6 @@ interface ViewTransform {
   offsetY: number
 }
 
-interface Viewport {
-  zoom: number
-  panX: number
-  panY: number
-}
-
 interface DragState {
   action: 'move' | 'resize' | 'pan'
   handle: 'nw' | 'ne' | 'sw' | 'se' | null
@@ -37,7 +32,7 @@ interface DragState {
 }
 
 let view: ViewTransform = { scale: 1, offsetX: 0, offsetY: 0 }
-const viewport: Viewport = { zoom: 1, panX: 0, panY: 0 }
+const viewport = useViewportController({ initialZoom: 1, minZoom: 0.25, maxZoom: 16 })
 let drag: DragState | null = null
 let spacePressed = false
 
@@ -54,6 +49,7 @@ function resizeCanvas(): void {
   canvas.value.height = Math.floor(height * dpr)
   canvas.value.style.width = `${width}px`
   canvas.value.style.height = `${height}px`
+  if (viewport.mode.value === 'fit') viewport.resetView()
   draw()
 }
 
@@ -65,16 +61,14 @@ function calculateView(): ViewTransform {
     (canvasCssSize.height - padding * 2) / store.source.height,
   )
   return {
-    scale: fitScale * viewport.zoom,
-    offsetX: (canvasCssSize.width - store.source.width * fitScale) / 2 + viewport.panX,
-    offsetY: (canvasCssSize.height - store.source.height * fitScale) / 2 + viewport.panY,
+    scale: fitScale * viewport.zoom.value,
+    offsetX: (canvasCssSize.width - store.source.width * fitScale) / 2 + viewport.panX.value,
+    offsetY: (canvasCssSize.height - store.source.height * fitScale) / 2 + viewport.panY.value,
   }
 }
 
 function resetViewport(): void {
-  viewport.zoom = 1
-  viewport.panX = 0
-  viewport.panY = 0
+  viewport.resetView()
   draw()
 }
 
@@ -86,11 +80,13 @@ function onWheel(event: WheelEvent): void {
   const point = { x: event.clientX - bounds.left, y: event.clientY - bounds.top }
   const sourceX = (point.x - view.offsetX) / view.scale
   const sourceY = (point.y - view.offsetY) / view.scale
-  const fitScale = view.scale / viewport.zoom
-  viewport.zoom = Math.max(0.25, Math.min(16, viewport.zoom * Math.exp(-event.deltaY * 0.002)))
-  const nextScale = fitScale * viewport.zoom
-  viewport.panX = point.x - sourceX * nextScale - (canvasCssSize.width - store.source!.width * fitScale) / 2
-  viewport.panY = point.y - sourceY * nextScale - (canvasCssSize.height - store.source!.height * fitScale) / 2
+  const fitScale = view.scale / viewport.zoom.value
+  const nextZoom = Math.max(0.25, Math.min(16, viewport.zoom.value * Math.exp(-event.deltaY * 0.002)))
+  viewport.zoom.value = nextZoom
+  viewport.setManual()
+  const nextScale = fitScale * nextZoom
+  viewport.panX.value = point.x - sourceX * nextScale - (canvasCssSize.width - store.source!.width * fitScale) / 2
+  viewport.panY.value = point.y - sourceY * nextScale - (canvasCssSize.height - store.source!.height * fitScale) / 2
   draw()
 }
 
@@ -262,7 +258,7 @@ function onPointerDown(event: PointerEvent): void {
   if (!store.source || !canvas.value) return
   const point = pointerPosition(event)
   if (spacePressed || event.button === 1) {
-    drag = { action: 'pan', handle: null, startX: point.x, startY: point.y, startRect: { x: viewport.panX, y: viewport.panY, width: 0, height: 0 }, snapStepX: 1, snapStepY: 1, snapOriginX: 0, snapOriginY: 0 }
+    drag = { action: 'pan', handle: null, startX: point.x, startY: point.y, startRect: { x: viewport.panX.value, y: viewport.panY.value, width: 0, height: 0 }, snapStepX: 1, snapStepY: 1, snapOriginX: 0, snapOriginY: 0 }
     canvas.value.setPointerCapture(event.pointerId)
     return
   }
@@ -318,8 +314,9 @@ function onPointerMove(event: PointerEvent): void {
   const dx = (point.x - drag.startX) / view.scale
   const dy = (point.y - drag.startY) / view.scale
   if (drag.action === 'pan') {
-    viewport.panX = drag.startRect.x + (point.x - drag.startX)
-    viewport.panY = drag.startRect.y + (point.y - drag.startY)
+    viewport.panX.value = drag.startRect.x + (point.x - drag.startX)
+    viewport.panY.value = drag.startRect.y + (point.y - drag.startY)
+    viewport.setManual()
     draw()
     return
   }
@@ -428,7 +425,7 @@ onBeforeUnmount(() => {
   background: #ffffff;
   border-bottom: 1px solid var(--border);
   color: #60676f;
-  font-size: 11px;
+  font-size: 12px;
 }
 .canvas-tools label { display: flex; align-items: center; gap: 5px; }
 .canvas-actions { display: flex; align-items: center; gap: 8px; }

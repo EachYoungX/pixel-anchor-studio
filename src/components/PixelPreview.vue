@@ -1,19 +1,23 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useProjectStore } from '@/stores/project'
 import type { PixelTool } from '@/types/project'
+import { useViewportController } from '@/composables/useViewportController'
 
 const store = useProjectStore()
 const editorShell = ref<HTMLDivElement | null>(null)
 const canvas = ref<HTMLCanvasElement | null>(null)
 const viewport = ref<HTMLDivElement | null>(null)
-const zoomLevels = [2, 3, 4, 5, 6, 8, 10, 12, 14]
-const zoom = ref(8)
+const zoomLevels = [1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24]
+const viewportController = useViewportController({ initialZoom: 8, minZoom: 1, maxZoom: 24 })
+const zoom = viewportController.zoom
 const painting = ref(false)
 const panning = ref(false)
 let panStart = { x: 0, y: 0, scrollLeft: 0, scrollTop: 0 }
 let lastPixel = ''
 let spacePressed = false
+let observer: ResizeObserver | null = null
+const viewportRevision = ref(0)
 const toolOptions: Array<[PixelTool, string]> = [
   ['brush', '画笔'],
   ['eyedropper', '吸管'],
@@ -26,6 +30,14 @@ const selectedColorForInput = computed({
   set: (value: string) => {
     store.selectedColor = value.toUpperCase()
   },
+})
+const stageSize = computed(() => {
+  viewportRevision.value
+  if (!store.result || !viewport.value) return { width: 0, height: 0 }
+  return {
+    width: Math.max(viewport.value.clientWidth - 36, store.result.width * zoom.value),
+    height: Math.max(viewport.value.clientHeight - 36, store.result.height * zoom.value),
+  }
 })
 
 function draw(): void {
@@ -152,6 +164,7 @@ function handleWheel(event: WheelEvent): void {
   const nextZoom = zoomLevels[nextIndex]
   if (nextZoom === zoom.value) return
   zoom.value = nextZoom
+  viewportController.setManual()
   nextTick(() => {
     if (!viewport.value) return
     viewport.value.scrollLeft = logicalX * zoom.value - localX + padding
@@ -161,8 +174,9 @@ function handleWheel(event: WheelEvent): void {
 
 function resetView(): void {
   if (!store.result || !viewport.value) return
-  const available = Math.min(viewport.value.clientWidth - 36, viewport.value.clientHeight - 36)
-  const fit = Math.max(2, Math.floor(available / Math.max(store.result.width, store.result.height)))
+  const fitScale = Math.min((viewport.value.clientWidth - 36) / store.result.width, (viewport.value.clientHeight - 36) / store.result.height)
+  const fit = Math.max(1, Math.floor(fitScale))
+  viewportController.fitView()
   zoom.value = zoomLevels.reduce((best, level) => (level <= fit ? level : best), zoomLevels[0])
   viewport.value.scrollLeft = 0
   viewport.value.scrollTop = 0
@@ -177,7 +191,18 @@ watch(
   { deep: false },
 )
 
-onMounted(draw)
+onMounted(() => {
+  draw()
+  if (viewport.value) {
+    observer = new ResizeObserver(() => {
+      viewportRevision.value += 1
+      if (viewportController.mode.value === 'fit') resetView()
+      else nextTick(draw)
+    })
+    observer.observe(viewport.value)
+  }
+})
+onBeforeUnmount(() => observer?.disconnect())
 </script>
 
 <template>
@@ -207,7 +232,7 @@ onMounted(draw)
       </div>
     </div>
     <div ref="viewport" class="pixel-viewport" @wheel="handleWheel" @pointermove="handlePointerMove" @pointerup="handlePointerUp" @pointercancel="handlePointerUp" @dblclick="resetView">
-      <canvas ref="canvas" class="pixel-canvas" @pointerdown="handlePointer" />
+      <div class="pixel-stage" :style="{ width: `${stageSize.width}px`, height: `${stageSize.height}px` }"><canvas ref="canvas" class="pixel-canvas" @pointerdown="handlePointer" /></div>
     </div>
   </div>
   <div v-else class="empty-state">
@@ -231,5 +256,6 @@ onMounted(draw)
 .color-picker { width: 30px; height: 26px; padding: 1px; border: 1px solid var(--border-strong); border-radius: 5px; background: #ffffff; }
 .color-picker-label code { color: #4b5158; font-size: 11px; }
 .pixel-viewport { min-height: 0; min-width: 0; overflow: auto; padding: 18px; background: #e9ebee; }
+.pixel-stage { min-width: 100%; min-height: 100%; display: grid; place-items: center; }
 .pixel-canvas { display: block; margin: auto; background: #ffffff; touch-action: none; image-rendering: pixelated; cursor: crosshair; }
 </style>

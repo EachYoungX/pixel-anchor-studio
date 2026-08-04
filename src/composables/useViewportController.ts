@@ -9,6 +9,20 @@ export interface ViewportController {
   panBy(dx: number, dy: number): void
   fitView(): void
   resetView(): void
+  setManual(): void
+  fitContent(request: FitRequest): number
+}
+
+export interface FitRequest {
+  viewportWidth: number
+  viewportHeight: number
+  contentWidth: number
+  contentHeight: number
+  padding: number
+}
+
+export function calculateFitZoom(request: FitRequest): number {
+  return Math.min((request.viewportWidth - request.padding * 2) / request.contentWidth, (request.viewportHeight - request.padding * 2) / request.contentHeight)
 }
 
 export function useViewportController(options: { initialZoom?: number; minZoom?: number; maxZoom?: number } = {}): ViewportController {
@@ -35,6 +49,17 @@ export function useViewportController(options: { initialZoom?: number; minZoom?:
     mode.value = 'manual'
   }
 
+  function setManual(): void { mode.value = 'manual' }
+
+  function fitContent(request: FitRequest): number {
+    const nextZoom = Math.max(minZoom, Math.min(maxZoom, calculateFitZoom(request)))
+    zoom.value = nextZoom
+    panX.value = 0
+    panY.value = 0
+    mode.value = 'fit'
+    return nextZoom
+  }
+
   function fitView(): void {
     zoom.value = initialZoom
     panX.value = 0
@@ -42,5 +67,5 @@ export function useViewportController(options: { initialZoom?: number; minZoom?:
     mode.value = 'fit'
   }
 
-  return { zoom, panX, panY, mode, zoomAtPoint, panBy, fitView, resetView: fitView }
+  return { zoom, panX, panY, mode, zoomAtPoint, panBy, fitView, resetView: fitView, setManual, fitContent }
 }

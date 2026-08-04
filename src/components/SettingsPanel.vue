@@ -175,7 +175,7 @@ async function generate(): Promise<void> {
 .mode-tabs .button { min-width: 0; padding-inline: 4px; white-space: nowrap; }
 .anchor-options { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
 .anchor-options .button { padding-inline: 3px; }
-.offset-line { display: grid; grid-template-columns: 34px 1fr 38px; align-items: center; gap: 6px; color: #4b5158; font-size: 11px; }
+.offset-line { display: grid; grid-template-columns: 34px 1fr 38px; align-items: center; gap: 6px; color: #4b5158; font-size: 12px; }
 .offset-line output { text-align: right; font-variant-numeric: tabular-nums; }
 .two-column { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .generate-area { padding: 14px; position: sticky; bottom: 0; background: #ffffff; border-top: 1px solid var(--border); }

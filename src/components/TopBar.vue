@@ -1,11 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { exportPaletteCsv } from '@/core/export/csv'
 import { sanitizeFilename } from '@/core/export/download'
-import { exportBeadPdf } from '@/core/export/pdf'
 import { exportPng } from '@/core/export/png'
 import { exportProjectFile, parseProjectFile } from '@/core/export/project'
-import { exportBeadSvg } from '@/core/export/svg'
 import { useProjectStore } from '@/stores/project'
 import BrandLogo from '@/components/BrandLogo.vue'
 import AboutDialog from '@/components/AboutDialog.vue'
@@ -52,26 +49,6 @@ async function savePng(scale: number): Promise<void> {
   await exportPng(store.result, `${baseName()}-${store.result.width}x${store.result.height}-${scale}x.png`, scale)
 }
 
-function saveSvg(): void {
-  if (!store.result || !store.canExportBead) return
-  exportBeadSvg(
-    store.result,
-    store.palette,
-    `${baseName()}-bead-chart.svg`,
-    store.bead.cellSize,
-    store.bead.indexFromOne,
-  )
-}
-
-function savePdf(): void {
-  if (!store.result || !store.canExportBead) return
-  exportBeadPdf(store.result, store.palette, store.bead, `${baseName()}-bead-chart.pdf`)
-}
-
-function saveCsv(): void {
-  if (!store.result) return
-  exportPaletteCsv(store.palette, `${baseName()}-palette.csv`)
-}
 </script>
 
 <template>
@@ -92,9 +69,6 @@ function saveCsv(): void {
       <span class="separator" aria-hidden="true" />
       <button class="button" type="button" :disabled="!store.result" @click="savePng(1)">PNG原尺寸</button>
       <button class="button" type="button" :disabled="!store.result" @click="savePng(8)">PNG八倍</button>
-      <button class="button" type="button" :disabled="!store.canExportBead" @click="saveSvg">拼豆SVG</button>
-      <button class="button" type="button" :disabled="!store.canExportBead" @click="savePdf">拼豆PDF</button>
-      <button class="button" type="button" :disabled="!store.result" @click="saveCsv">颜色CSV</button>
     </nav>
     <input ref="imageInput" class="hidden-input" type="file" accept="image/*" @change="handleImage" />
     <input ref="projectInput" class="hidden-input" type="file" accept=".json,application/json" @change="handleProject" />
