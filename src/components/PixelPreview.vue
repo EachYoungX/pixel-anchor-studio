@@ -5,9 +5,13 @@ import type { PixelTool } from '@/types/project'
 
 const store = useProjectStore()
 const canvas = ref<HTMLCanvasElement | null>(null)
+const viewport = ref<HTMLDivElement | null>(null)
 const zoom = ref(8)
 const painting = ref(false)
+const panning = ref(false)
+let panStart = { x: 0, y: 0, scrollLeft: 0, scrollTop: 0 }
 let lastPixel = ''
+let spacePressed = false
 const toolOptions: Array<[PixelTool, string]> = [
   ['brush', '画笔'],
   ['eyedropper', '吸管'],
@@ -82,6 +86,13 @@ function pixelFromPointer(event: PointerEvent): { x: number; y: number } | null 
 }
 
 function handlePointer(event: PointerEvent): void {
+  if (spacePressed || event.button === 1) {
+    if (!viewport.value) return
+    panning.value = true
+    panStart = { x: event.clientX, y: event.clientY, scrollLeft: viewport.value.scrollLeft, scrollTop: viewport.value.scrollTop }
+    viewport.value.setPointerCapture(event.pointerId)
+    return
+  }
   const pixel = pixelFromPointer(event)
   if (!pixel) return
   painting.value = true
@@ -92,6 +103,11 @@ function handlePointer(event: PointerEvent): void {
 }
 
 function handlePointerMove(event: PointerEvent): void {
+  if (panning.value && viewport.value) {
+    viewport.value.scrollLeft = panStart.scrollLeft - (event.clientX - panStart.x)
+    viewport.value.scrollTop = panStart.scrollTop - (event.clientY - panStart.y)
+    return
+  }
   if (!painting.value) return
   const pixel = pixelFromPointer(event)
   if (!pixel) return
@@ -103,7 +119,9 @@ function handlePointerMove(event: PointerEvent): void {
 }
 
 function handlePointerUp(event: PointerEvent): void {
+  if (viewport.value?.hasPointerCapture(event.pointerId)) viewport.value.releasePointerCapture(event.pointerId)
   if (canvas.value?.hasPointerCapture(event.pointerId)) canvas.value.releasePointerCapture(event.pointerId)
+  panning.value = false
   painting.value = false
   lastPixel = ''
 }
@@ -111,6 +129,7 @@ function handlePointerUp(event: PointerEvent): void {
 function handleKeydown(event: KeyboardEvent): void {
   const target = event.target as HTMLElement | null
   if (target && ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName)) return
+  if (event.code === 'Space') { spacePressed = true; event.preventDefault(); return }
   const modifier = event.ctrlKey || event.metaKey
   if (!modifier) return
   if (event.key.toLowerCase() === 'z' && event.shiftKey) {
@@ -131,6 +150,9 @@ function handleWheel(event: WheelEvent): void {
   const next = zoom.value * Math.exp(-event.deltaY * 0.002)
   zoom.value = Math.max(2, Math.min(14, Math.round(next)))
 }
+function handleKeyup(event: KeyboardEvent): void {
+  if (event.code === 'Space') spacePressed = false
+}
 
 watch(
   () => [store.result, store.palette, zoom.value],
@@ -142,7 +164,7 @@ onMounted(draw)
 </script>
 
 <template>
-  <div v-if="store.result" class="preview-shell" tabindex="0" @keydown="handleKeydown">
+  <div v-if="store.result" class="preview-shell" tabindex="0" @keydown="handleKeydown" @keyup="handleKeyup">
     <div class="editor-toolbar">
       <div class="tool-group">
         <button
@@ -173,8 +195,8 @@ onMounted(draw)
         <output>{{ zoom }}×</output>
       </label>
     </div>
-    <div class="pixel-viewport" @wheel="handleWheel">
-      <canvas ref="canvas" class="pixel-canvas" @pointerdown="handlePointer" @pointermove="handlePointerMove" @pointerup="handlePointerUp" @pointercancel="handlePointerUp" />
+    <div ref="viewport" class="pixel-viewport" @wheel="handleWheel" @pointermove="handlePointerMove" @pointerup="handlePointerUp" @pointercancel="handlePointerUp">
+      <canvas ref="canvas" class="pixel-canvas" @pointerdown="handlePointer" />
     </div>
   </div>
   <div v-else class="empty-state">
