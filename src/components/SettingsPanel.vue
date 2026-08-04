@@ -39,7 +39,7 @@ async function generate(): Promise<void> {
           :class="{ 'button-active': store.scale.mode === 'direct' }"
           type="button"
           @click="store.scale.mode = 'direct'; store.scale.directAxis = 'longSide'"
-        >指定输出尺寸</button>
+        >自定义尺寸</button>
         <button
           class="button button-small"
           :class="{ 'button-active': store.scale.mode === 'anchor' }"
@@ -164,7 +164,8 @@ async function generate(): Promise<void> {
 .settings-section { display: grid; gap: 12px; padding: 14px; border-bottom: 1px solid var(--border); }
 .section-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .section-title span { color: var(--muted); font-size: 11px; }
-.mode-tabs .button { min-width: 74px; }
+.mode-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.mode-tabs .button { min-width: 0; padding-inline: 4px; white-space: nowrap; }
 .anchor-options { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
 .anchor-options .button { padding-inline: 3px; }
 .offset-line { display: grid; grid-template-columns: 34px 1fr 38px; align-items: center; gap: 6px; color: #4b5158; font-size: 11px; }
