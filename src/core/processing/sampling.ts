@@ -78,9 +78,19 @@ function averageSample(pixels: number[][]): [number, number, number, number] {
 
 function medianSample(pixels: number[][]): [number, number, number, number] {
   if (pixels.length === 0) return [0, 0, 0, 0]
-  const channels = [0, 1, 2, 3].map((channel) => pixels.map((pixel) => pixel[channel]).sort((a, b) => a - b))
+  const histograms = [new Uint32Array(256), new Uint32Array(256), new Uint32Array(256), new Uint32Array(256)]
+  for (const pixel of pixels) {
+    for (let channel = 0; channel < 4; channel += 1) histograms[channel][pixel[channel]] += 1
+  }
   const middle = Math.floor(pixels.length / 2)
-  const median = channels.map((channel) => channel[middle])
+  const median = histograms.map((histogram) => {
+    let accumulated = 0
+    for (let value = 0; value < 256; value += 1) {
+      accumulated += histogram[value]
+      if (accumulated > middle) return value
+    }
+    return 255
+  })
   let best = pixels[0]
   let bestDistance = Infinity
   for (const pixel of pixels) {
