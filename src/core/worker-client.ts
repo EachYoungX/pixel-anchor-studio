@@ -29,6 +29,8 @@ function getWorker(): Worker {
   worker.onerror = (event) => {
     for (const request of pending.values()) request.reject(event.error ?? new Error(event.message))
     pending.clear()
+    loadedSources.clear()
+    worker = null
   }
   return worker
 }
