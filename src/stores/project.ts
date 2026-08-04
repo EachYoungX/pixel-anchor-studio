@@ -96,9 +96,15 @@ export const useProjectStore = defineStore('project', () => {
   const history = ref<PixelResult[]>([])
   const future = ref<PixelResult[]>([])
   let latestProcessId = 0
+  let sourceRevision = 0
+  let cachedProcessKey = ''
+  let cachedProcessResult: PixelResult | null = null
 
   function releaseCurrentSource(): void {
     latestProcessId += 1
+    sourceRevision += 1
+    cachedProcessKey = ''
+    cachedProcessResult = null
     source.value = null
     sourceImage.value = null
     sourceImageData.value = null
@@ -201,6 +207,19 @@ export const useProjectStore = defineStore('project', () => {
     status.value = '正在生成像素矩阵'
     try {
       const dimensions = outputDimensions.value
+      const processKey = JSON.stringify({
+        sourceRevision,
+        crop: effectiveCrop.value,
+        anchor,
+        scale,
+        processing,
+      })
+      if (cachedProcessKey === processKey && cachedProcessResult) {
+        result.value = markRaw(cloneResult(cachedProcessResult))
+        refreshPalette()
+        status.value = `已复用 ${result.value.width} × ${result.value.height} 生成结果，${palette.value.length} 色`
+        return
+      }
       const response = await runProcessing({
         source: {
           width: sourceImageData.value.width,
@@ -214,6 +233,8 @@ export const useProjectStore = defineStore('project', () => {
       })
       if (processId !== latestProcessId) return
       result.value = markRaw(response.result)
+      cachedProcessKey = processKey
+      cachedProcessResult = cloneResult(response.result)
       lastDurationMs.value = response.durationMs
       history.value = []
       future.value = []
@@ -239,6 +260,8 @@ export const useProjectStore = defineStore('project', () => {
   function setPixel(x: number, y: number, color = selectedColor.value, record = true): void {
     if (!result.value || x < 0 || y < 0 || x >= result.value.width || y >= result.value.height) return
     if (record) pushHistory()
+    cachedProcessKey = ''
+    cachedProcessResult = null
     const rgba = hexToRgba(color)
     const offset = (y * result.value.width + x) * 4
     result.value.data[offset] = rgba[0]
@@ -263,6 +286,8 @@ export const useProjectStore = defineStore('project', () => {
   function fillPixel(x: number, y: number): void {
     if (!result.value || x < 0 || y < 0 || x >= result.value.width || y >= result.value.height) return
     pushHistory()
+    cachedProcessKey = ''
+    cachedProcessResult = null
     const width = result.value.width
     const height = result.value.height
     const start = y * width + x
@@ -304,6 +329,8 @@ export const useProjectStore = defineStore('project', () => {
   function mergeColor(fromHex: string, toHex: string): void {
     if (!result.value || fromHex === toHex) return
     pushHistory()
+    cachedProcessKey = ''
+    cachedProcessResult = null
     const from = hexToRgba(fromHex)
     const to = hexToRgba(toHex)
     for (let offset = 0; offset < result.value.data.length; offset += 4) {
@@ -322,6 +349,8 @@ export const useProjectStore = defineStore('project', () => {
   function mergeSimilar(): void {
     if (!result.value || mergeStrength.value === 'off') return
     pushHistory()
+    cachedProcessKey = ''
+    cachedProcessResult = null
     const merged = mergeSimilarColors(result.value, mergeStrength.value)
     result.value = markRaw(merged.result)
     refreshPalette()
@@ -332,6 +361,8 @@ export const useProjectStore = defineStore('project', () => {
     if (!result.value || history.value.length === 0) return
     future.value.push(cloneResult(result.value))
     result.value = markRaw(history.value.pop()!)
+    cachedProcessKey = ''
+    cachedProcessResult = null
     refreshPalette()
   }
 
@@ -339,6 +370,8 @@ export const useProjectStore = defineStore('project', () => {
     if (!result.value || future.value.length === 0) return
     history.value.push(cloneResult(result.value))
     result.value = markRaw(future.value.pop()!)
+    cachedProcessKey = ''
+    cachedProcessResult = null
     refreshPalette()
   }
 
