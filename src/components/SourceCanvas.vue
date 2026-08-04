@@ -212,7 +212,7 @@ function draw(): void {
 
   drawGrid(context)
   drawRect(context, store.effectiveCrop, store.editTarget === 'crop', '裁剪区域', '#34495E')
-  if (store.scale.mode === 'anchor' || store.scale.mode === 'pseudo' || store.editTarget === 'anchor') {
+  if (store.scale.mode === 'anchor') {
     drawRect(context, store.anchor, store.editTarget === 'anchor', '特征锚点', '#8B4A43')
   }
 }

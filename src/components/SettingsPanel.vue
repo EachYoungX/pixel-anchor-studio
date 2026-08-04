@@ -38,19 +38,19 @@ async function generate(): Promise<void> {
           class="button button-small"
           :class="{ 'button-active': store.scale.mode === 'direct' }"
           type="button"
-          @click="store.scale.mode = 'direct'; store.scale.directAxis = 'longSide'"
+          @click="store.setScaleMode('direct')"
         >自定义尺寸</button>
         <button
           class="button button-small"
           :class="{ 'button-active': store.scale.mode === 'anchor' }"
           type="button"
-          @click="store.scale.mode = 'anchor'"
+          @click="store.setScaleMode('anchor')"
         >特征锚定</button>
         <button
           class="button button-small"
           :class="{ 'button-active': store.scale.mode === 'pseudo' }"
           type="button"
-          @click="store.scale.mode = 'pseudo'"
+          @click="store.setScaleMode('pseudo')"
         >伪像素对齐</button>
       </div>
 

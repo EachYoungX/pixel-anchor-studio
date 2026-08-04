@@ -10,6 +10,12 @@ export type SnapMode = 'source-pixel' | 'target-cell' | 'off'
 export type EditTarget = 'crop' | 'anchor'
 export type PixelTool = 'brush' | 'eyedropper' | 'fill' | 'eraser'
 
+export interface SnapSettings {
+  direct: SnapMode
+  anchor: SnapMode
+  pseudo: SnapMode
+}
+
 export interface Rect {
   x: number
   y: number
@@ -39,6 +45,7 @@ export interface ScaleSettings {
   offsetY: number
   snapToGrid?: boolean
   snapMode?: SnapMode
+  snapSettings?: SnapSettings
 }
 
 export interface ProcessingSettings {

@@ -21,7 +21,15 @@ import type {
   ScaleSettings,
   SerializedProject,
   SourceState,
+  ScaleMode,
+  SnapSettings,
 } from '@/types/project'
+
+const defaultSnapSettings = (): SnapSettings => ({
+  direct: 'source-pixel',
+  anchor: 'source-pixel',
+  pseudo: 'target-cell',
+})
 
 const defaultScale = (): ScaleSettings => ({
   mode: 'direct',
@@ -33,6 +41,7 @@ const defaultScale = (): ScaleSettings => ({
   offsetY: 0,
   snapToGrid: false,
   snapMode: 'source-pixel',
+  snapSettings: defaultSnapSettings(),
 })
 
 const defaultProcessing = (): ProcessingSettings => ({
@@ -218,6 +227,15 @@ export const useProjectStore = defineStore('project', () => {
     if (!source.value) return
     cropSettings.mode = 'center-square'
     editTarget.value = 'crop'
+  }
+
+  function setScaleMode(mode: ScaleMode): void {
+    const settings = scale.snapSettings ?? defaultSnapSettings()
+    if (scale.snapMode) settings[scale.mode] = scale.snapMode
+    scale.snapSettings = settings
+    scale.mode = mode
+    editTarget.value = mode === 'anchor' ? 'anchor' : 'crop'
+    scale.snapMode = settings[mode]
   }
 
   function resetGridPhase(): void {
@@ -486,6 +504,7 @@ export const useProjectStore = defineStore('project', () => {
     useCustomCrop,
     useFullCrop,
     useCenterSquareCrop,
+    setScaleMode,
     resetGridPhase,
     process,
     applyTool,
