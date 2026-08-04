@@ -91,6 +91,7 @@ export interface SerializedProject {
 }
 
 export interface ProcessRequest {
+  sourceId?: string
   source: {
     width: number
     height: number

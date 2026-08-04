@@ -2,6 +2,7 @@ import type { ProcessRequest, ProcessResponse } from '@/types/project'
 
 let worker: Worker | null = null
 let sequence = 0
+const loadedSources = new Set<string>()
 
 interface PendingRequest {
   resolve: (value: ProcessResponse) => void
@@ -32,19 +33,22 @@ function getWorker(): Worker {
   return worker
 }
 
-export function runProcessing(request: ProcessRequest): Promise<ProcessResponse> {
+export function runProcessing(request: ProcessRequest, sourceId = 'default'): Promise<ProcessResponse> {
   const requestId = ++sequence
   const activeWorker = getWorker()
   return new Promise((resolve, reject) => {
     pending.set(requestId, { resolve, reject })
-    const payload = {
-      ...request,
-      requestId,
-      source: {
-        ...request.source,
-        data: new Uint8ClampedArray(request.source.data),
-      },
+    if (!loadedSources.has(sourceId)) {
+      const data = new Uint8ClampedArray(request.source.data)
+      activeWorker.postMessage({ type: 'load-source', sourceId, width: request.source.width, height: request.source.height, data }, [data.buffer])
+      loadedSources.add(sourceId)
     }
-    activeWorker.postMessage(payload, [payload.source.data.buffer])
+    const { source: _source, ...settings } = request
+    activeWorker.postMessage({ type: 'process', ...settings, requestId, sourceId })
   })
+}
+
+export function releaseProcessingSource(sourceId: string): void {
+  if (!loadedSources.delete(sourceId)) return
+  worker?.postMessage({ type: 'release-source', sourceId })
 }

@@ -6,7 +6,7 @@ import { loadHtmlImage, loadSourceFile, imageToImageData } from '@/core/image/lo
 import { buildPalette } from '@/core/palette'
 import { mergeSimilarColors } from '@/core/processing/palette-merge'
 import { base64ToBytes, bytesToBase64 } from '@/core/export/project'
-import { runProcessing } from '@/core/worker-client'
+import { releaseProcessingSource, runProcessing } from '@/core/worker-client'
 import type {
   BeadSettings,
   CropMode,
@@ -98,12 +98,15 @@ export const useProjectStore = defineStore('project', () => {
   const future = ref<PixelResult[]>([])
   let latestProcessId = 0
   let sourceRevision = 0
+  const sourceId = ref('source-0')
   let cachedProcessKey = ''
   let cachedProcessResult: PixelResult | null = null
 
   function releaseCurrentSource(): void {
     latestProcessId += 1
     sourceRevision += 1
+    releaseProcessingSource(sourceId.value)
+    sourceId.value = `source-${sourceRevision}`
     cachedProcessKey = ''
     cachedProcessResult = null
     source.value = null
@@ -222,6 +225,7 @@ export const useProjectStore = defineStore('project', () => {
         return
       }
       const response = await runProcessing({
+        sourceId: sourceId.value,
         source: {
           width: sourceImageData.value.width,
           height: sourceImageData.value.height,
@@ -231,7 +235,7 @@ export const useProjectStore = defineStore('project', () => {
         output: { width: dimensions.width, height: dimensions.height },
         scaleOffset: { x: scale.offsetX, y: scale.offsetY },
         processing: { ...toRaw(processing) },
-      })
+      }, sourceId.value)
       if (processId !== latestProcessId) return
       result.value = markRaw(response.result)
       cachedProcessKey = processKey
