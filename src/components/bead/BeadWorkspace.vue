@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useProjectStore } from '@/stores/project'
+import BeadPreview from '@/components/bead/BeadPreview.vue'
 
 const store = useProjectStore()
 </script>
@@ -32,6 +33,11 @@ const store = useProjectStore()
         <span>{{ store.palette.length }} 种颜色 · {{ Math.ceil(store.result.width / store.bead.pageColumns) * Math.ceil(store.result.height / store.bead.pageRows) }} 页</span>
         <p>颜色明细和合并操作位于右侧“颜色与用量”面板。</p>
       </section>
+      <section class="bead-card bead-grid-card">
+        <h3>拼豆网格预览</h3>
+        <p>虚线表示分页边界，格内显示当前色号。</p>
+        <BeadPreview />
+      </section>
     </div>
   </section>
 </template>
@@ -40,6 +46,7 @@ const store = useProjectStore()
 .bead-workspace { min-height: 560px; background: #fff; }
 .bead-header { min-height: 80px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px; border-bottom: 1px solid var(--border); }
 .bead-content { display: grid; grid-template-columns: minmax(260px, 420px) minmax(220px, 1fr); gap: 12px; padding: 16px; }
+.bead-grid-card { grid-column: 1 / -1; }
 .bead-card { display: grid; gap: 14px; align-content: start; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-muted); }
 .bead-summary strong { font-size: 28px; color: var(--accent); }
 .bead-summary span { color: var(--muted); font-size: 12px; }
