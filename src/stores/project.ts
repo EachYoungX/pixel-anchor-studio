@@ -59,6 +59,15 @@ function clampRect(rect: Rect, width: number, height: number, minimum = 4): Rect
   return result
 }
 
+function snapRectToSourcePixels(rect: Rect): Rect {
+  return {
+    x: Math.round(rect.x),
+    y: Math.round(rect.y),
+    width: Math.max(1, Math.round(rect.width)),
+    height: Math.max(1, Math.round(rect.height)),
+  }
+}
+
 function cloneResult(result: PixelResult): PixelResult {
   return { width: result.width, height: result.height, data: new Uint8ClampedArray(result.data) }
 }
@@ -146,14 +155,14 @@ export const useProjectStore = defineStore('project', () => {
 
   function updateCrop(next: Rect): void {
     if (!source.value) return
-    Object.assign(crop, clampRect(next, source.value.width, source.value.height, 8))
+    Object.assign(crop, clampRect(snapRectToSourcePixels(next), source.value.width, source.value.height, 8))
     cropSettings.mode = 'custom'
   }
 
   function updateAnchor(next: Rect): void {
     if (!source.value) return
     const square = Math.max(4, Math.min(next.width, next.height))
-    Object.assign(anchor, clampRect({ ...next, width: square, height: square }, source.value.width, source.value.height, 4))
+    Object.assign(anchor, clampRect(snapRectToSourcePixels({ ...next, width: square, height: square }), source.value.width, source.value.height, 4))
   }
 
   function resetCrop(): void {
