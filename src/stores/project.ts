@@ -378,7 +378,7 @@ export const useProjectStore = defineStore('project', () => {
   function serialize(): SerializedProject {
     return {
       format: 'pixel-anchor-project',
-      version: 1,
+      version: 2,
       savedAt: new Date().toISOString(),
       source: source.value ? { ...source.value } : null,
       crop: { ...toRaw(crop) },

@@ -24,7 +24,7 @@ export function exportProjectFile(project: SerializedProject, filename: string):
 
 export async function parseProjectFile(file: File): Promise<SerializedProject> {
   const parsed = JSON.parse(await file.text()) as SerializedProject
-  if (parsed.format !== 'pixel-anchor-project' || parsed.version !== 1) {
+  if (parsed.format !== 'pixel-anchor-project' || (parsed.version !== 1 && parsed.version !== 2)) {
     throw new Error('不支持的项目文件格式')
   }
   return parsed

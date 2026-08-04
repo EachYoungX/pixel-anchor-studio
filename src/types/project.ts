@@ -75,7 +75,7 @@ export interface SerializedPixelResult {
 
 export interface SerializedProject {
   format: 'pixel-anchor-project'
-  version: 1
+  version: 1 | 2
   savedAt: string
   source: SourceState | null
   crop: Rect
