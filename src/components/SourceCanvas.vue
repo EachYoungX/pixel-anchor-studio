@@ -26,7 +26,7 @@ interface DragState {
 let view: ViewTransform = { scale: 1, offsetX: 0, offsetY: 0 }
 let drag: DragState | null = null
 
-const activeRect = computed(() => (store.editTarget === 'anchor' ? store.anchor : store.crop))
+const activeRect = computed(() => (store.editTarget === 'anchor' ? store.anchor : store.effectiveCrop))
 
 function resizeCanvas(): void {
   if (!host.value || !canvas.value) return
@@ -72,7 +72,7 @@ function drawChecker(context: CanvasRenderingContext2D, width: number, height: n
 
 function drawGrid(context: CanvasRenderingContext2D): void {
   if (!showGrid.value || !store.source) return
-  const crop = toScreen(store.crop)
+  const crop = toScreen(store.effectiveCrop)
   const output = store.outputDimensions
   const stepX = Math.max(1, Math.ceil(output.width / 64))
   const stepY = Math.max(1, Math.ceil(output.height / 64))
@@ -110,9 +110,11 @@ function drawRect(context: CanvasRenderingContext2D, rect: Rect, active: boolean
   context.fillStyle = color
   context.font = '12px sans-serif'
   const labelWidth = context.measureText(label).width + 12
-  context.fillRect(screen.x, Math.max(0, screen.y - 22), labelWidth, 20)
+  const labelY = screen.y >= 24 ? screen.y - 22 : screen.y + 2
+  context.fillRect(Math.round(screen.x), Math.round(labelY), Math.ceil(labelWidth), 20)
   context.fillStyle = '#FFFFFF'
-  context.fillText(label, screen.x + 6, Math.max(14, screen.y - 8))
+  context.textBaseline = 'middle'
+  context.fillText(label, Math.round(screen.x + 6), Math.round(labelY + 10))
 
   if (active) {
     const handleSize = 8
@@ -157,7 +159,7 @@ function draw(): void {
     store.source.height * view.scale,
   )
 
-  const cropScreen = toScreen(store.crop)
+  const cropScreen = toScreen(store.effectiveCrop)
   context.save()
   context.fillStyle = 'rgba(20, 24, 28, 0.48)'
   context.beginPath()
@@ -167,7 +169,7 @@ function draw(): void {
   context.restore()
 
   drawGrid(context)
-  drawRect(context, store.crop, store.editTarget === 'crop', '裁剪区域', '#34495E')
+  drawRect(context, store.effectiveCrop, store.editTarget === 'crop', '裁剪区域', '#34495E')
   if (store.scale.mode === 'anchor' || store.scale.mode === 'pseudo' || store.editTarget === 'anchor') {
     drawRect(context, store.anchor, store.editTarget === 'anchor', '特征锚点', '#8B4A43')
   }
@@ -265,7 +267,7 @@ function onPointerUp(event: PointerEvent): void {
 }
 
 watch(
-  () => [store.source, store.crop.x, store.crop.y, store.crop.width, store.crop.height, store.anchor.x, store.anchor.y, store.anchor.width, store.scale.mode, store.scale.offsetX, store.scale.offsetY, store.outputDimensions.width, store.outputDimensions.height, store.editTarget, showGrid.value],
+  () => [store.source, store.effectiveCrop.x, store.effectiveCrop.y, store.effectiveCrop.width, store.effectiveCrop.height, store.anchor.x, store.anchor.y, store.anchor.width, store.scale.mode, store.scale.offsetX, store.scale.offsetY, store.outputDimensions.width, store.outputDimensions.height, store.editTarget, showGrid.value],
   () => nextTick(draw),
   { deep: false },
 )

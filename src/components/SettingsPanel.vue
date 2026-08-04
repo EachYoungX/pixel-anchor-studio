@@ -1,19 +1,7 @@
 <script setup lang="ts">
-import { watch } from 'vue'
 import { useProjectStore } from '@/stores/project'
-import type { ScaleMode } from '@/types/project'
 
 const store = useProjectStore()
-
-watch(
-  () => store.scale.mode,
-  (mode: ScaleMode) => {
-    store.editTarget = mode === 'anchor' ? 'anchor' : 'crop'
-    if (mode === 'pseudo' && store.processing.sampling === 'average') {
-      store.processing.sampling = 'dominant'
-    }
-  },
-)
 
 async function generate(): Promise<void> {
   try {
@@ -28,8 +16,8 @@ async function generate(): Promise<void> {
   <aside>
     <section class="settings-section">
       <div class="section-title">
-        <h2>一、裁剪区域</h2>
-        <span>{{ Math.round(store.crop.width) }} × {{ Math.round(store.crop.height) }}</span>
+        <h2>一、图像范围</h2>
+        <span>{{ Math.round(store.effectiveCrop.width) }} × {{ Math.round(store.effectiveCrop.height) }}</span>
       </div>
       <div class="segmented">
         <button
@@ -38,7 +26,7 @@ async function generate(): Promise<void> {
           type="button"
           @click="store.editTarget = 'crop'"
         >
-          编辑裁剪框
+          编辑自由裁剪
         </button>
         <button
           class="button button-small"
@@ -47,19 +35,20 @@ async function generate(): Promise<void> {
           :disabled="!store.source"
           @click="store.editTarget = 'anchor'"
         >
-          编辑锚点框
+          编辑特征锚点
         </button>
       </div>
       <div class="segmented">
-        <button class="button button-small" type="button" :disabled="!store.source" @click="store.resetCrop">完整原图</button>
-        <button class="button button-small" type="button" :disabled="!store.source" @click="store.centerSquareCrop">居中正方形</button>
+        <button class="button button-small" :class="{ 'button-active': store.cropSettings.mode === 'full' }" type="button" :disabled="!store.source" @click="store.resetCrop">完整原图</button>
+        <button class="button button-small" :class="{ 'button-active': store.cropSettings.mode === 'center-square' }" type="button" :disabled="!store.source" @click="store.centerSquareCrop">居中正方形</button>
       </div>
+      <p class="help">当前使用：{{ store.cropSettings.mode === 'full' ? '完整原图' : store.cropSettings.mode === 'center-square' ? '居中正方形' : '自由裁剪' }}</p>
       <p class="help">在原图画布中拖动框体，拖动四角可调整范围。所有位置均按原图浮点坐标保存。</p>
     </section>
 
     <section class="settings-section">
       <div class="section-title">
-        <h2>二、目标尺度</h2>
+        <h2>二、像素化方式</h2>
         <span>{{ store.outputDimensions.width }} × {{ store.outputDimensions.height }}</span>
       </div>
       <div class="segmented mode-tabs">
@@ -68,7 +57,7 @@ async function generate(): Promise<void> {
           :class="{ 'button-active': store.scale.mode === 'direct' }"
           type="button"
           @click="store.scale.mode = 'direct'"
-        >直接尺寸</button>
+        >指定输出尺寸</button>
         <button
           class="button button-small"
           :class="{ 'button-active': store.scale.mode === 'anchor' }"
@@ -80,7 +69,7 @@ async function generate(): Promise<void> {
           :class="{ 'button-active': store.scale.mode === 'pseudo' }"
           type="button"
           @click="store.scale.mode = 'pseudo'"
-        >伪像素重整</button>
+        >伪像素对齐</button>
       </div>
 
       <template v-if="store.scale.mode === 'direct'">
@@ -137,29 +126,31 @@ async function generate(): Promise<void> {
         <label class="offset-line">
           <span>水平</span>
           <input v-model.number="store.scale.offsetX" class="range" type="range" min="-0.5" max="0.5" step="0.01" />
-          <output>{{ store.scale.offsetX.toFixed(2) }}</output>
+          <input v-model.number="store.scale.offsetX" class="input offset-input" type="number" min="-0.5" max="0.5" step="0.01" />
         </label>
         <label class="offset-line">
           <span>垂直</span>
           <input v-model.number="store.scale.offsetY" class="range" type="range" min="-0.5" max="0.5" step="0.01" />
-          <output>{{ store.scale.offsetY.toFixed(2) }}</output>
+          <input v-model.number="store.scale.offsetY" class="input offset-input" type="number" min="-0.5" max="0.5" step="0.01" />
         </label>
+        <button class="button button-small" type="button" @click="store.resetGridPhase">偏移归零</button>
       </div>
     </section>
 
     <section class="settings-section">
       <div class="section-title"><h2>三、采样与颜色</h2></div>
       <div class="field">
-        <label for="sampling">单元格采样</label>
+          <label for="sampling">单元格采样</label>
         <select id="sampling" v-model="store.processing.sampling" class="select">
           <option value="average">区域平均</option>
           <option value="median">区域中位数</option>
-          <option value="dominant">多数色</option>
-          <option value="nearest">中心最近邻</option>
+          <option value="dominant">主色块</option>
+          <option value="nearest">中心取样</option>
         </select>
       </div>
+      <p class="help sampling-help">{{ store.processing.sampling === 'median' ? '抑制少量亮点和杂色，适合人像、动物和通用图片。' : store.processing.sampling === 'average' ? '混合整格颜色，适合渐变和柔和风景。' : store.processing.sampling === 'dominant' ? '选择格内占比最高的主色块，适合平涂图和伪像素图。' : '只读取格子中心，适合网格已对齐的建筑和线稿。' }}</p>
       <label class="checkbox-row">
-        <span>颜色归一化</span>
+        <span>限制最大颜色数</span>
         <input v-model="store.processing.quantize" type="checkbox" />
       </label>
       <div v-if="store.processing.quantize" class="field">
@@ -182,31 +173,6 @@ async function generate(): Promise<void> {
         <span>保留透明区域</span>
         <input v-model="store.processing.preserveAlpha" type="checkbox" />
       </label>
-    </section>
-
-    <section class="settings-section">
-      <div class="section-title"><h2>四、拼豆导出</h2></div>
-      <div class="field">
-        <label for="bead-limit">允许的最大颜色数</label>
-        <input id="bead-limit" v-model.number="store.bead.maxColors" class="input" type="number" min="2" max="256" />
-      </div>
-      <div class="two-column">
-        <div class="field">
-          <label for="page-columns">每页列数</label>
-          <input id="page-columns" v-model.number="store.bead.pageColumns" class="input" type="number" min="5" max="80" />
-        </div>
-        <div class="field">
-          <label for="page-rows">每页行数</label>
-          <input id="page-rows" v-model.number="store.bead.pageRows" class="input" type="number" min="5" max="80" />
-        </div>
-      </div>
-      <label class="checkbox-row">
-        <span>行列编号从1开始</span>
-        <input v-model="store.bead.indexFromOne" type="checkbox" />
-      </label>
-      <p v-if="store.palette.length > store.bead.maxColors" class="warning">
-        当前有 {{ store.palette.length }} 种颜色，超过拼豆导出上限 {{ store.bead.maxColors }}。请提高颜色归一化强度后重新生成。
-      </p>
     </section>
 
     <section class="generate-area">

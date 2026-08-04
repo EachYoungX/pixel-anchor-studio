@@ -8,6 +8,7 @@ import { base64ToBytes, bytesToBase64 } from '@/core/export/project'
 import { runProcessing } from '@/core/worker-client'
 import type {
   BeadSettings,
+  CropMode,
   EditTarget,
   PaletteEntry,
   PixelResult,
@@ -30,10 +31,10 @@ const defaultScale = (): ScaleSettings => ({
 })
 
 const defaultProcessing = (): ProcessingSettings => ({
-  sampling: 'average',
+  sampling: 'median',
   quantize: true,
-  maxColors: 24,
-  cleanup: 'light',
+  maxColors: 64,
+  cleanup: 'off',
   preserveAlpha: true,
   transparentThreshold: 24,
 })
@@ -41,8 +42,8 @@ const defaultProcessing = (): ProcessingSettings => ({
 const defaultBead = (): BeadSettings => ({
   maxColors: 64,
   cellSize: 24,
-  pageColumns: 30,
-  pageRows: 40,
+  pageColumns: 64,
+  pageRows: 64,
   indexFromOne: true,
 })
 
@@ -64,6 +65,7 @@ export const useProjectStore = defineStore('project', () => {
   const sourceImage = ref<HTMLImageElement | null>(null)
   const sourceImageData = ref<ImageData | null>(null)
   const crop = reactive<Rect>({ x: 0, y: 0, width: 1, height: 1 })
+  const cropSettings = reactive({ mode: 'custom' as CropMode, customRect: crop })
   const anchor = reactive<Rect>({ x: 0, y: 0, width: 32, height: 32 })
   const scale = reactive<ScaleSettings>(defaultScale())
   const processing = reactive<ProcessingSettings>(defaultProcessing())
@@ -80,7 +82,16 @@ export const useProjectStore = defineStore('project', () => {
   const history = ref<PixelResult[]>([])
   const future = ref<PixelResult[]>([])
 
-  const outputDimensions = computed(() => calculateOutputDimensions(crop, anchor, scale))
+  const effectiveCrop = computed<Rect>(() => {
+    if (!source.value) return crop
+    if (cropSettings.mode === 'full') return { x: 0, y: 0, width: source.value.width, height: source.value.height }
+    if (cropSettings.mode === 'center-square') {
+      const side = Math.min(source.value.width, source.value.height)
+      return { x: (source.value.width - side) / 2, y: (source.value.height - side) / 2, width: side, height: side }
+    }
+    return crop
+  })
+  const outputDimensions = computed(() => calculateOutputDimensions(effectiveCrop.value, anchor, scale))
   const canProcess = computed(() => Boolean(source.value && sourceImageData.value))
   const beadCount = computed(() => palette.value.reduce((total, entry) => total + entry.count, 0))
   const canExportBead = computed(() => Boolean(result.value && palette.value.length > 0 && palette.value.length <= bead.maxColors))
@@ -104,6 +115,7 @@ export const useProjectStore = defineStore('project', () => {
     sourceImage.value = markRaw(loaded.image)
     sourceImageData.value = markRaw(imageToImageData(loaded.image))
     Object.assign(crop, { x: 0, y: 0, width: loaded.source.width, height: loaded.source.height })
+    cropSettings.mode = 'custom'
     const anchorSide = Math.max(8, Math.min(loaded.source.width, loaded.source.height) * 0.12)
     Object.assign(anchor, {
       x: Math.max(0, loaded.source.width * 0.5 - anchorSide / 2),
@@ -122,6 +134,7 @@ export const useProjectStore = defineStore('project', () => {
   function updateCrop(next: Rect): void {
     if (!source.value) return
     Object.assign(crop, clampRect(next, source.value.width, source.value.height, 8))
+    cropSettings.mode = 'custom'
   }
 
   function updateAnchor(next: Rect): void {
@@ -132,18 +145,17 @@ export const useProjectStore = defineStore('project', () => {
 
   function resetCrop(): void {
     if (!source.value) return
-    Object.assign(crop, { x: 0, y: 0, width: source.value.width, height: source.value.height })
+    cropSettings.mode = 'full'
   }
 
   function centerSquareCrop(): void {
     if (!source.value) return
-    const side = Math.min(source.value.width, source.value.height)
-    Object.assign(crop, {
-      x: (source.value.width - side) / 2,
-      y: (source.value.height - side) / 2,
-      width: side,
-      height: side,
-    })
+    cropSettings.mode = 'center-square'
+  }
+
+  function resetGridPhase(): void {
+    scale.offsetX = 0
+    scale.offsetY = 0
   }
 
   async function process(): Promise<void> {
@@ -158,7 +170,7 @@ export const useProjectStore = defineStore('project', () => {
           height: sourceImageData.value.height,
           data: sourceImageData.value.data,
         },
-        crop: { ...toRaw(crop) },
+        crop: { ...toRaw(effectiveCrop.value) },
         output: { width: dimensions.width, height: dimensions.height },
         scaleOffset: { x: scale.offsetX, y: scale.offsetY },
         processing: { ...toRaw(processing) },
@@ -289,6 +301,7 @@ export const useProjectStore = defineStore('project', () => {
       savedAt: new Date().toISOString(),
       source: source.value ? { ...source.value } : null,
       crop: { ...toRaw(crop) },
+      cropSettings: { mode: cropSettings.mode, customRect: { ...toRaw(crop) } },
       anchor: { ...toRaw(anchor) },
       scale: { ...toRaw(scale) },
       processing: { ...toRaw(processing) },
@@ -312,6 +325,7 @@ export const useProjectStore = defineStore('project', () => {
       sourceImageData.value = null
     }
     Object.assign(crop, project.crop)
+    cropSettings.mode = project.cropSettings?.mode ?? 'custom'
     Object.assign(anchor, project.anchor)
     Object.assign(scale, project.scale)
     Object.assign(processing, project.processing)
@@ -354,11 +368,14 @@ export const useProjectStore = defineStore('project', () => {
     beadCount,
     canExportBead,
     sourceLabel,
+    cropSettings,
+    effectiveCrop,
     importImage,
     updateCrop,
     updateAnchor,
     resetCrop,
     centerSquareCrop,
+    resetGridPhase,
     process,
     applyTool,
     mergeColor,

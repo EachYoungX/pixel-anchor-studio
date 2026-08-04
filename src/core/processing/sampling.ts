@@ -80,7 +80,17 @@ function medianSample(pixels: number[][]): [number, number, number, number] {
   if (pixels.length === 0) return [0, 0, 0, 0]
   const channels = [0, 1, 2, 3].map((channel) => pixels.map((pixel) => pixel[channel]).sort((a, b) => a - b))
   const middle = Math.floor(pixels.length / 2)
-  return channels.map((channel) => channel[middle]) as [number, number, number, number]
+  const median = channels.map((channel) => channel[middle])
+  let best = pixels[0]
+  let bestDistance = Infinity
+  for (const pixel of pixels) {
+    const distance = (pixel[0] - median[0]) ** 2 + (pixel[1] - median[1]) ** 2 + (pixel[2] - median[2]) ** 2 + (pixel[3] - median[3]) ** 2
+    if (distance < bestDistance) {
+      best = pixel
+      bestDistance = distance
+    }
+  }
+  return best as [number, number, number, number]
 }
 
 function dominantSample(pixels: number[][]): [number, number, number, number] {

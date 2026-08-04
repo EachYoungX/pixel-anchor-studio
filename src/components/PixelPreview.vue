@@ -80,6 +80,30 @@ function handlePointer(event: PointerEvent): void {
   draw()
 }
 
+function handleKeydown(event: KeyboardEvent): void {
+  const target = event.target as HTMLElement | null
+  if (target && ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName)) return
+  const modifier = event.ctrlKey || event.metaKey
+  if (!modifier) return
+  if (event.key.toLowerCase() === 'z' && event.shiftKey) {
+    event.preventDefault()
+    store.redo()
+  } else if (event.key.toLowerCase() === 'z') {
+    event.preventDefault()
+    store.undo()
+  } else if (event.key.toLowerCase() === 'y') {
+    event.preventDefault()
+    store.redo()
+  }
+}
+
+function handleWheel(event: WheelEvent): void {
+  if (!event.ctrlKey && !event.metaKey) return
+  event.preventDefault()
+  const next = zoom.value * Math.exp(-event.deltaY * 0.002)
+  zoom.value = Math.max(2, Math.min(14, Math.round(next)))
+}
+
 watch(
   () => [store.result, store.palette, zoom.value],
   () => nextTick(draw),
@@ -90,7 +114,7 @@ onMounted(draw)
 </script>
 
 <template>
-  <div v-if="store.result" class="preview-shell">
+  <div v-if="store.result" class="preview-shell" tabindex="0" @keydown="handleKeydown">
     <div class="editor-toolbar">
       <div class="tool-group">
         <button
@@ -121,7 +145,7 @@ onMounted(draw)
         <output>{{ zoom }}×</output>
       </label>
     </div>
-    <div class="canvas-scroll">
+    <div class="pixel-viewport" @wheel="handleWheel">
       <canvas ref="canvas" class="pixel-canvas" @pointerdown="handlePointer" />
     </div>
   </div>
@@ -146,6 +170,6 @@ onMounted(draw)
 .color-picker { width: 30px; height: 26px; padding: 1px; border: 1px solid var(--border-strong); border-radius: 5px; background: #ffffff; }
 .color-picker-label code { color: #4b5158; font-size: 11px; }
 .zoom-control { margin-left: auto; display: grid; grid-template-columns: auto 100px 28px; align-items: center; gap: 7px; color: #4f565e; font-size: 11px; }
-.canvas-scroll { max-height: 540px; min-height: 260px; overflow: auto; padding: 18px; background: #e9ebee; }
+.pixel-viewport { height: clamp(360px, 55vh, 620px); min-width: 0; overflow: auto; padding: 18px; background: #e9ebee; }
 .pixel-canvas { display: block; margin: auto; background: #ffffff; touch-action: none; image-rendering: pixelated; cursor: crosshair; }
 </style>

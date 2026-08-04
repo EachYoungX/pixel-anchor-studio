@@ -1,4 +1,5 @@
 export type ScaleMode = 'direct' | 'anchor' | 'pseudo'
+export type CropMode = 'custom' | 'full' | 'center-square'
 export type DirectAxis = 'width' | 'height' | 'longSide'
 export type SamplingMode = 'average' | 'median' | 'dominant' | 'nearest'
 export type CleanupStrength = 'off' | 'light' | 'medium' | 'strong'
@@ -10,6 +11,11 @@ export interface Rect {
   y: number
   width: number
   height: number
+}
+
+export interface CropSettings {
+  mode: CropMode
+  customRect: Rect
 }
 
 export interface SourceState {
@@ -71,6 +77,7 @@ export interface SerializedProject {
   savedAt: string
   source: SourceState | null
   crop: Rect
+  cropSettings?: CropSettings
   anchor: Rect
   scale: ScaleSettings
   processing: ProcessingSettings
