@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { nextTick, ref } from 'vue'
 import { sanitizeFilename } from '@/core/export/download'
 import { exportPng } from '@/core/export/png'
 import { exportProjectFile, parseProjectFile } from '@/core/export/project'
@@ -10,7 +10,13 @@ import AboutDialog from '@/components/AboutDialog.vue'
 const store = useProjectStore()
 const imageInput = ref<HTMLInputElement | null>(null)
 const projectInput = ref<HTMLInputElement | null>(null)
+const brandButton = ref<HTMLButtonElement | null>(null)
 const aboutOpen = ref(false)
+
+function closeAbout(): void {
+  aboutOpen.value = false
+  nextTick(() => brandButton.value?.focus())
+}
 
 function baseName(): string {
   return sanitizeFilename(store.source?.name ?? 'pixel-art')
@@ -55,7 +61,7 @@ async function savePng(scale: number): Promise<void> {
   <header class="top-bar">
     <div class="brand">
       <BrandLogo />
-      <button class="brand-button" type="button" title="关于工具" @click="aboutOpen = true">
+      <button ref="brandButton" class="brand-button" type="button" title="关于工具" @click="aboutOpen = true">
         <strong>锚点像素工作台</strong>
         <span>图片像素化与拼豆图工具</span>
       </button>
@@ -72,7 +78,7 @@ async function savePng(scale: number): Promise<void> {
     </nav>
     <input ref="imageInput" class="hidden-input" type="file" accept="image/*" @change="handleImage" />
     <input ref="projectInput" class="hidden-input" type="file" accept=".json,application/json" @change="handleProject" />
-    <AboutDialog :open="aboutOpen" @close="aboutOpen = false" />
+    <AboutDialog :open="aboutOpen" @close="closeAbout" />
   </header>
 </template>
 
