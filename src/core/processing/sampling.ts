@@ -113,8 +113,19 @@ function dominantSample(pixels: number[][]): [number, number, number, number] {
     for (let channel = 0; channel < 4; channel += 1) bucket.sum[channel] += pixel[channel]
     buckets.set(key, bucket)
   }
-  const dominant = [...buckets.values()].sort((a, b) => b.count - a.count)[0]
-  return dominant.sum.map((value) => Math.round(value / dominant.count)) as [number, number, number, number]
+  const dominantEntry = [...buckets.entries()].sort((a, b) => b[1].count - a[1].count)[0]
+  const dominantKey = dominantEntry[0]
+  const dominant = dominantEntry[1]
+  const target = dominant.sum.map((value) => value / dominant.count)
+  let best = pixels[0]
+  let bestDistance = Infinity
+  for (const pixel of pixels) {
+    const key = `${pixel[0] >> 4},${pixel[1] >> 4},${pixel[2] >> 4},${pixel[3] >> 5}`
+    if (key !== dominantKey) continue
+    const distance = (pixel[0] - target[0]) ** 2 + (pixel[1] - target[1]) ** 2 + (pixel[2] - target[2]) ** 2 + (pixel[3] - target[3]) ** 2
+    if (distance < bestDistance) { best = pixel; bestDistance = distance }
+  }
+  return best as [number, number, number, number]
 }
 
 function sampleByMode(
