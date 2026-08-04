@@ -15,8 +15,14 @@ interface ViewTransform {
   offsetY: number
 }
 
+interface Viewport {
+  zoom: number
+  panX: number
+  panY: number
+}
+
 interface DragState {
-  action: 'move' | 'resize'
+  action: 'move' | 'resize' | 'pan'
   handle: 'nw' | 'ne' | 'sw' | 'se' | null
   startX: number
   startY: number
@@ -24,7 +30,9 @@ interface DragState {
 }
 
 let view: ViewTransform = { scale: 1, offsetX: 0, offsetY: 0 }
+const viewport: Viewport = { zoom: 1, panX: 0, panY: 0 }
 let drag: DragState | null = null
+let spacePressed = false
 
 const activeRect = computed(() => (store.editTarget === 'anchor' ? store.anchor : store.effectiveCrop))
 
@@ -38,15 +46,36 @@ function resizeCanvas(): void {
 function calculateView(): ViewTransform {
   if (!canvas.value || !store.source) return { scale: 1, offsetX: 0, offsetY: 0 }
   const padding = 24
-  const scale = Math.min(
+  const fitScale = Math.min(
     (canvas.value.width - padding * 2) / store.source.width,
     (canvas.value.height - padding * 2) / store.source.height,
   )
   return {
-    scale,
-    offsetX: (canvas.value.width - store.source.width * scale) / 2,
-    offsetY: (canvas.value.height - store.source.height * scale) / 2,
+    scale: fitScale * viewport.zoom,
+    offsetX: (canvas.value.width - store.source.width * fitScale) / 2 + viewport.panX,
+    offsetY: (canvas.value.height - store.source.height * fitScale) / 2 + viewport.panY,
   }
+}
+
+function resetViewport(): void {
+  viewport.zoom = 1
+  viewport.panX = 0
+  viewport.panY = 0
+  draw()
+}
+
+function onWheel(event: WheelEvent): void {
+  if (!event.ctrlKey && !event.metaKey) return
+  event.preventDefault()
+  const point = { x: event.offsetX, y: event.offsetY }
+  const sourceX = (point.x - view.offsetX) / view.scale
+  const sourceY = (point.y - view.offsetY) / view.scale
+  const fitScale = view.scale / viewport.zoom
+  viewport.zoom = Math.max(0.25, Math.min(16, viewport.zoom * Math.exp(-event.deltaY * 0.002)))
+  const nextScale = fitScale * viewport.zoom
+  viewport.panX = point.x - sourceX * nextScale - (canvas.value!.width - store.source!.width * fitScale) / 2
+  viewport.panY = point.y - sourceY * nextScale - (canvas.value!.height - store.source!.height * fitScale) / 2
+  draw()
 }
 
 function toScreen(rect: Rect): Rect {
@@ -203,6 +232,11 @@ function contains(point: { x: number; y: number }, rect: Rect): boolean {
 function onPointerDown(event: PointerEvent): void {
   if (!store.source || !canvas.value) return
   const point = pointerPosition(event)
+  if (spacePressed || event.button === 1) {
+    drag = { action: 'pan', handle: null, startX: point.x, startY: point.y, startRect: { x: viewport.panX, y: viewport.panY, width: 0, height: 0 } }
+    canvas.value.setPointerCapture(event.pointerId)
+    return
+  }
   const current = { ...activeRect.value }
   const handle = detectHandle(point, current)
   if (!handle && !contains(point, current)) return
@@ -250,6 +284,12 @@ function onPointerMove(event: PointerEvent): void {
   const point = pointerPosition(event)
   const dx = (point.x - drag.startX) / view.scale
   const dy = (point.y - drag.startY) / view.scale
+  if (drag.action === 'pan') {
+    viewport.panX = drag.startRect.x + (point.x - drag.startX)
+    viewport.panY = drag.startRect.y + (point.y - drag.startY)
+    draw()
+    return
+  }
   let next: Rect
   if (drag.action === 'move') {
     next = { ...drag.startRect, x: drag.startRect.x + dx, y: drag.startRect.y + dy }
@@ -276,16 +316,33 @@ onMounted(() => {
   observer = new ResizeObserver(resizeCanvas)
   if (host.value) observer.observe(host.value)
   resizeCanvas()
+  host.value?.addEventListener('wheel', onWheel, { passive: false })
+  window.addEventListener('keydown', onKeyDown)
+  window.addEventListener('keyup', onKeyUp)
 })
 
-onBeforeUnmount(() => observer?.disconnect())
+function onKeyDown(event: KeyboardEvent): void {
+  if (event.code === 'Space') { spacePressed = true; event.preventDefault() }
+  if ((event.ctrlKey || event.metaKey) && event.key === '0') { event.preventDefault(); resetViewport() }
+}
+
+function onKeyUp(event: KeyboardEvent): void {
+  if (event.code === 'Space') spacePressed = false
+}
+
+onBeforeUnmount(() => {
+  observer?.disconnect()
+  host.value?.removeEventListener('wheel', onWheel)
+  window.removeEventListener('keydown', onKeyDown)
+  window.removeEventListener('keyup', onKeyUp)
+})
 </script>
 
 <template>
   <div ref="host" class="source-canvas-host">
     <div class="canvas-tools">
       <span>当前编辑：{{ store.editTarget === 'crop' ? '裁剪框' : '锚点框' }}</span>
-      <label><input v-model="showGrid" type="checkbox" /> 显示网格</label>
+      <span class="canvas-actions"><button class="button button-small" type="button" @click="resetViewport">适应窗口</button><span>{{ Math.round(viewport.zoom * 100) }}%</span><label><input v-model="showGrid" type="checkbox" /> 显示网格</label></span>
     </div>
     <canvas
       ref="canvas"
@@ -294,6 +351,7 @@ onBeforeUnmount(() => observer?.disconnect())
       @pointermove="onPointerMove"
       @pointerup="onPointerUp"
       @pointercancel="onPointerUp"
+      @dblclick="resetViewport"
     />
   </div>
 </template>
@@ -312,5 +370,6 @@ onBeforeUnmount(() => observer?.disconnect())
   font-size: 11px;
 }
 .canvas-tools label { display: flex; align-items: center; gap: 5px; }
+.canvas-actions { display: flex; align-items: center; gap: 8px; }
 .source-canvas { width: 100%; display: block; touch-action: none; cursor: crosshair; }
 </style>
