@@ -97,6 +97,19 @@ export const useProjectStore = defineStore('project', () => {
   const future = ref<PixelResult[]>([])
   let latestProcessId = 0
 
+  function releaseCurrentSource(): void {
+    latestProcessId += 1
+    source.value = null
+    sourceImage.value = null
+    sourceImageData.value = null
+    result.value = null
+    palette.value = []
+    colorCodes.value = {}
+    history.value = []
+    future.value = []
+    status.value = '已释放当前图片'
+  }
+
   const effectiveCrop = computed<Rect>(() => {
     if (!source.value) return crop
     if (cropSettings.mode === 'full') return { x: 0, y: 0, width: source.value.width, height: source.value.height }
@@ -132,6 +145,7 @@ export const useProjectStore = defineStore('project', () => {
   watch(paletteSort, refreshPalette)
 
   async function importImage(file: File): Promise<void> {
+    releaseCurrentSource()
     const loaded = await loadSourceFile(file)
     source.value = loaded.source
     sourceImage.value = markRaw(loaded.image)
@@ -348,6 +362,7 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   async function loadSerialized(project: SerializedProject): Promise<void> {
+    releaseCurrentSource()
     if (project.source) {
       const image = await loadHtmlImage(project.source.dataUrl)
       source.value = { ...project.source }
@@ -421,5 +436,6 @@ export const useProjectStore = defineStore('project', () => {
     serialize,
     loadSerialized,
     refreshPalette,
+    releaseCurrentSource,
   }
 })
