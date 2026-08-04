@@ -7,6 +7,7 @@ const store = useProjectStore()
 const editorShell = ref<HTMLDivElement | null>(null)
 const canvas = ref<HTMLCanvasElement | null>(null)
 const viewport = ref<HTMLDivElement | null>(null)
+const zoomLevels = [2, 3, 4, 5, 6, 8, 10, 12, 14]
 const zoom = ref(8)
 const painting = ref(false)
 const panning = ref(false)
@@ -157,8 +158,12 @@ function handleWheel(event: WheelEvent): void {
   const oldZoom = zoom.value
   const logicalX = (viewport.value.scrollLeft + localX - padding) / oldZoom
   const logicalY = (viewport.value.scrollTop + localY - padding) / oldZoom
-  const next = zoom.value * Math.exp(-event.deltaY * 0.002)
-  zoom.value = Math.max(2, Math.min(14, Math.round(next)))
+  const currentIndex = zoomLevels.indexOf(zoom.value)
+  const direction = event.deltaY < 0 ? 1 : -1
+  const nextIndex = Math.max(0, Math.min(zoomLevels.length - 1, currentIndex + direction))
+  const nextZoom = zoomLevels[nextIndex]
+  if (nextZoom === zoom.value) return
+  zoom.value = nextZoom
   nextTick(() => {
     if (!viewport.value) return
     viewport.value.scrollLeft = logicalX * zoom.value - localX + padding
@@ -206,7 +211,9 @@ onMounted(draw)
       </div>
       <label class="zoom-control">
         缩放
-        <input v-model.number="zoom" class="range" type="range" min="2" max="14" step="1" />
+        <select v-model.number="zoom" class="select zoom-select">
+          <option v-for="level in zoomLevels" :key="level" :value="level">{{ level }}×</option>
+        </select>
         <output>{{ zoom }}×</output>
       </label>
     </div>
