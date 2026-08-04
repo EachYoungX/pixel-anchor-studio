@@ -5,6 +5,9 @@ import { useProjectStore } from '@/stores/project'
 
 const store = useProjectStore()
 const canvas = ref<HTMLCanvasElement | null>(null)
+const showGrid = ref(true)
+const showLabels = ref(true)
+const showPages = ref(true)
 
 function draw(): void {
   const element = canvas.value
@@ -27,16 +30,18 @@ function draw(): void {
     const hex = rgbaToHex(...rgba)
     context.fillStyle = rgba[3] === 0 ? '#fff' : hex
     context.fillRect(x * cell, y * cell, cell, cell)
-    context.strokeStyle = '#b8bdc5'
-    context.strokeRect(x * cell + 0.5, y * cell + 0.5, cell, cell)
+    if (showGrid.value) {
+      context.strokeStyle = '#b8bdc5'
+      context.strokeRect(x * cell + 0.5, y * cell + 0.5, cell, cell)
+    }
     const code = codes.get(hex)
-    if (code && cell >= 14) {
+    if (showLabels.value && code && cell >= 14) {
       const luminance = 0.2126 * rgba[0] + 0.7152 * rgba[1] + 0.0722 * rgba[2]
       context.fillStyle = luminance > 145 ? '#111' : '#fff'
       context.fillText(code, x * cell + cell / 2, y * cell + cell / 2)
     }
   }
-  if (cell >= 12) {
+  if (showPages.value && cell >= 12) {
     context.strokeStyle = '#8b4a43'
     context.setLineDash([5, 3])
     for (let x = store.bead.pageColumns; x < result.width; x += store.bead.pageColumns) {
@@ -49,17 +54,24 @@ function draw(): void {
   }
 }
 
-watch(() => [store.result, store.palette, store.bead.pageColumns, store.bead.pageRows], () => nextTick(draw), { deep: false })
+watch(() => [store.result, store.palette, store.bead.pageColumns, store.bead.pageRows, showGrid.value, showLabels.value, showPages.value], () => nextTick(draw), { deep: false })
 onMounted(draw)
 </script>
 
 <template>
   <div class="bead-preview-viewport">
+    <div class="bead-preview-tools">
+      <label><input v-model="showGrid" type="checkbox" /> 网格</label>
+      <label><input v-model="showLabels" type="checkbox" /> 色号</label>
+      <label><input v-model="showPages" type="checkbox" /> 分页边界</label>
+    </div>
     <canvas ref="canvas" class="bead-canvas" />
   </div>
 </template>
 
 <style scoped>
-.bead-preview-viewport { max-height: 620px; overflow: auto; padding: 14px; background: #e9ebee; border: 1px solid var(--border); border-radius: var(--radius); }
+.bead-preview-viewport { min-height: 0; overflow: auto; padding: 14px; background: #e9ebee; border: 1px solid var(--border); border-radius: var(--radius); }
+.bead-preview-tools { position: sticky; top: -14px; z-index: 1; display: flex; gap: 10px; padding: 4px 0 10px; background: #e9ebee; color: #4f565e; font-size: 11px; }
+.bead-preview-tools label { display: flex; align-items: center; gap: 4px; }
 .bead-canvas { display: block; margin: auto; image-rendering: pixelated; }
 </style>

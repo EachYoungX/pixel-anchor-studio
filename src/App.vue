@@ -23,10 +23,9 @@ useGlobalShortcuts()
       <button class="button button-small" :class="{ 'button-active': workspaceMode === 'bead' }" type="button" :disabled="!store.result" @click="workspaceMode = 'bead'">拼豆图导出</button>
     </nav>
     <div class="workspace" :class="{ 'workspace--bead': workspaceMode === 'bead' }">
-      <SettingsPanel v-if="workspaceMode === 'pixel'" class="panel panel-left" />
-      <main class="main-stage">
-        <BeadWorkspace v-if="workspaceMode === 'bead'" class="stage-card" />
-        <template v-else>
+      <template v-if="workspaceMode === 'pixel'">
+        <SettingsPanel class="panel panel-left" />
+        <main class="main-stage">
         <section class="stage-card">
           <div class="stage-heading">
             <div>
@@ -48,9 +47,10 @@ useGlobalShortcuts()
           </div>
           <PixelPreview />
         </section>
-        </template>
-      </main>
-      <PalettePanel class="panel panel-right" />
+        </main>
+        <PalettePanel class="panel panel-right" />
+      </template>
+      <BeadWorkspace v-else class="bead-workspace-stage" />
     </div>
     <footer class="status-bar">
       <span>{{ store.status }}</span>

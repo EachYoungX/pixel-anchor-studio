@@ -44,8 +44,8 @@ export function exportBeadPdf(
     const availableWidth = pageWidth - margin * 2 - labelSpace * 2
     const availableHeight = pageHeight - margin * 2 - labelSpace * 2 - 10
     const cellSize = Math.min(availableWidth / slice.width, availableHeight / slice.height)
-    const originX = margin + labelSpace
-    const originY = margin + labelSpace + 6
+    const originX = (pageWidth - slice.width * cellSize) / 2
+    const originY = (pageHeight - slice.height * cellSize) / 2
 
     document.setFont('helvetica', 'normal')
     document.setTextColor(35, 39, 42)
@@ -100,18 +100,17 @@ export function exportBeadPdf(
     }
   })
 
-  const itemsPerPage = 42
-  for (let start = 0; start < palette.length; start += itemsPerPage) {
-    document.addPage('a4', 'portrait')
+  const legendEntries = palette.slice(0, 64)
+  if (legendEntries.length > 0) {
+    document.addPage('a4', 'landscape')
     document.setTextColor(30, 34, 38)
     document.setFontSize(14)
     document.text('Color legend', 14, 16)
-    const entries = palette.slice(start, start + itemsPerPage)
-    entries.forEach((entry, index) => {
-      const column = index >= 21 ? 1 : 0
-      const row = index % 21
-      const x = 14 + column * 92
-      const y = 26 + row * 12
+    legendEntries.forEach((entry, index) => {
+      const column = Math.floor(index / 16)
+      const row = index % 16
+      const x = 14 + column * 68
+      const y = 26 + row * 10
       document.setFillColor(entry.rgba[0], entry.rgba[1], entry.rgba[2])
       document.setDrawColor(150, 155, 160)
       document.rect(x, y - 5, 7, 7, 'FD')

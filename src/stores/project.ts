@@ -57,8 +57,8 @@ const defaultProcessing = (): ProcessingSettings => ({
 const defaultBead = (): BeadSettings => ({
   maxColors: 64,
   cellSize: 24,
-  pageColumns: 64,
-  pageRows: 64,
+  pageColumns: 32,
+  pageRows: 32,
   indexFromOne: true,
 })
 
