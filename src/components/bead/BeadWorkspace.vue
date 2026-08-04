@@ -24,6 +24,7 @@ const store = useProjectStore()
         <label class="checkbox-row"><span>行列编号从 1 开始</span><input v-model="store.bead.indexFromOne" type="checkbox" /></label>
         <label class="field">拼豆最大颜色数<input v-model.number="store.bead.maxColors" class="input" type="number" min="2" max="256" /></label>
         <p v-if="store.palette.length > store.bead.maxColors" class="warning">当前 {{ store.palette.length }} 色，超过拼豆上限 {{ store.bead.maxColors }}。</p>
+        <p v-if="store.bead.pageColumns > 48 || store.bead.pageRows > 48" class="warning">每页超过 48 格时，A4 导出单格和色号会较小，建议使用 32–48 格/页。</p>
       </section>
       <section class="bead-card bead-summary">
         <h3>材料统计</h3>

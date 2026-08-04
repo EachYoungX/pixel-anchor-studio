@@ -86,6 +86,7 @@ export const useProjectStore = defineStore('project', () => {
   const lastDurationMs = ref(0)
   const history = ref<PixelResult[]>([])
   const future = ref<PixelResult[]>([])
+  let latestProcessId = 0
 
   const effectiveCrop = computed<Rect>(() => {
     if (!source.value) return crop
@@ -172,6 +173,7 @@ export const useProjectStore = defineStore('project', () => {
 
   async function process(): Promise<void> {
     if (!sourceImageData.value || !source.value) return
+    const processId = ++latestProcessId
     isProcessing.value = true
     status.value = '正在生成像素矩阵'
     try {
@@ -187,6 +189,7 @@ export const useProjectStore = defineStore('project', () => {
         scaleOffset: { x: scale.offsetX, y: scale.offsetY },
         processing: { ...toRaw(processing) },
       })
+      if (processId !== latestProcessId) return
       result.value = markRaw(response.result)
       lastDurationMs.value = response.durationMs
       history.value = []
@@ -195,10 +198,11 @@ export const useProjectStore = defineStore('project', () => {
       const adjusted = dimensions.adjusted ? '，尺寸已约束到256以内' : ''
       status.value = `已生成 ${response.result.width} × ${response.result.height}，${palette.value.length} 色${adjusted}`
     } catch (error) {
+      if (processId !== latestProcessId) return
       status.value = error instanceof Error ? error.message : '图像处理失败'
       throw error
     } finally {
-      isProcessing.value = false
+      if (processId === latestProcessId) isProcessing.value = false
     }
   }
 
