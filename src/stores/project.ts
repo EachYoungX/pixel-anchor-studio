@@ -358,7 +358,7 @@ export const useProjectStore = defineStore('project', () => {
       sourceImage.value = null
       sourceImageData.value = null
     }
-    Object.assign(crop, project.crop)
+    Object.assign(crop, project.cropSettings?.customRect ?? project.crop)
     cropSettings.mode = project.cropSettings?.mode ?? 'custom'
     Object.assign(anchor, project.anchor)
     Object.assign(scale, project.scale)
