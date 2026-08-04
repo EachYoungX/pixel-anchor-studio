@@ -175,8 +175,8 @@ async function generate(): Promise<void> {
 .mode-tabs .button { min-width: 0; padding-inline: 4px; white-space: nowrap; }
 .anchor-options { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
 .anchor-options .button { padding-inline: 3px; }
-.offset-line { display: grid; grid-template-columns: 42px minmax(72px, 1fr) 76px; align-items: center; gap: 8px; color: #4b5158; font-size: 12px; }
-.offset-input { min-width: 76px; padding-inline: 6px 4px; text-align: right; font-variant-numeric: tabular-nums; }
+.offset-line { display: grid; grid-template-columns: 42px minmax(72px, 1fr) 70px; align-items: center; gap: 8px; color: #4b5158; font-size: 12px; }
+.offset-input { width: 100%; min-width: 0; text-align: right; font-variant-numeric: tabular-nums; }
 .offset-line output { text-align: right; font-variant-numeric: tabular-nums; }
 .two-column { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .generate-area { padding: 14px; position: sticky; bottom: 0; background: #ffffff; border-top: 1px solid var(--border); }

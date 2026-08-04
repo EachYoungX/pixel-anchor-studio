@@ -6,7 +6,7 @@ export const beadDocumentStyle = {
   legendTitlePt: 14,
   legendTextPt: 8,
   gridStrokeWidthMm: 0.35,
-  legendColumnWidthMm: 68,
+  legendColumnWidthMm: 72,
 }
 
 export function ptToMm(pt: number): number {

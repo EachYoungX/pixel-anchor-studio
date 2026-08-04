@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { buildLegendPageCommands } from '@/core/bead/document-commands'
 import { createBeadDocumentLayout } from '@/core/bead/document-layout'
 import type { BeadSettings, PaletteEntry, PixelResult } from '@/types/project'
 
@@ -35,5 +36,16 @@ describe('createBeadDocumentLayout', () => {
     expect(layout.pdfLegendPages).toHaveLength(2)
     expect(layout.pdfLegendPages[0].entries).toHaveLength(64)
     expect(layout.pdfLegendPages[1].entries).toHaveLength(6)
+  })
+
+  it('keeps legend columns separated from the previous quantity field', () => {
+    const layout = createBeadDocumentLayout(result, palette, settings)
+    const commands = buildLegendPageCommands(layout.pdfLegendPages[0])
+    const swatches = commands.filter((command) => command.type === 'rect')
+    const quantities = commands.filter((command) => command.type === 'text' && command.text.startsWith('×'))
+
+    expect(swatches[16].x - swatches[0].x).toBe(72)
+    expect(quantities[0].x).toBe(72)
+    expect(swatches[16].x - quantities[0].x).toBe(14)
   })
 })

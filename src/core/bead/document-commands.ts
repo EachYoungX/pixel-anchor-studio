@@ -32,7 +32,7 @@ export function buildLegendPageCommands(page: BeadLegendPageLayout): DocumentCom
     commands.push({ type: 'rect', x, y: y - 5, width: 5.5, height: 5.5, fill: entry.hex, stroke: '#969ba0', strokeWidthMm: 0.25 })
     commands.push({ type: 'text', x: x + 8, y, text: entry.code, fontSizePt: beadDocumentStyle.legendTextPt, color: '#1e2226', align: 'left' })
     commands.push({ type: 'text', x: x + 18, y, text: entry.hex, fontSizePt: beadDocumentStyle.legendTextPt, color: '#1e2226', align: 'left' })
-    commands.push({ type: 'text', x: x + 65, y, text: `×${entry.count}`, fontSizePt: beadDocumentStyle.legendTextPt, color: '#1e2226', align: 'right' })
+    commands.push({ type: 'text', x: x + 58, y, text: `×${entry.count}`, fontSizePt: beadDocumentStyle.legendTextPt, color: '#1e2226', align: 'right' })
   })
   return commands
 }

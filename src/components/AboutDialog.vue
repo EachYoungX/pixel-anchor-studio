@@ -57,7 +57,7 @@ watch(() => props.open, (open) => { if (open) focusDialog() })
 
 <style scoped>
 .dialog-backdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 20px; background: rgba(20, 24, 28, 0.35); }
-.about-dialog { width: min(720px, calc(100vw - 40px)); max-height: min(720px, calc(100dvh - 48px)); display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; overflow: hidden; padding: 0; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
+.about-dialog { width: min(720px, calc(100vw - 40px)); height: min(720px, calc(100dvh - 48px)); display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; overflow: hidden; padding: 0; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
 .about-header { display: flex; align-items: center; gap: 12px; padding: 22px 24px 18px; border-bottom: 1px solid var(--border); }
 .about-header h2 { font-size: 22px; }
 .about-header p { font-size: 14px; }
