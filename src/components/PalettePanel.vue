@@ -13,6 +13,15 @@ const store = useProjectStore()
       </div>
       <span v-if="store.result">{{ store.beadCount }} 个有色格 / {{ store.result.width * store.result.height }} 总格</span>
     </header>
+    <div class="palette-sort">
+      <label for="palette-sort">排序</label>
+      <select id="palette-sort" v-model="store.paletteSort" class="select">
+        <option value="count-desc">用量</option>
+        <option value="hue">色环</option>
+        <option value="lightness">明度</option>
+        <option value="code">色号</option>
+      </select>
+    </div>
 
     <div v-if="store.palette.length === 0" class="empty-state">
       生成结果后，此处显示色号、颜色值和数量统计。
@@ -20,6 +29,15 @@ const store = useProjectStore()
 
     <div v-else class="palette-body">
       <p class="palette-help">点击条目选择画笔颜色。可将任意颜色合并到当前颜色。</p>
+      <div class="merge-controls">
+        <select v-model="store.mergeStrength" class="select">
+          <option value="off">自动合并：关闭</option>
+          <option value="conservative">自动合并：保守</option>
+          <option value="balanced">自动合并：平衡</option>
+          <option value="strong">自动合并：强</option>
+        </select>
+        <button class="button button-small" type="button" :disabled="store.mergeStrength === 'off'" @click="store.mergeSimilar">执行合并</button>
+      </div>
       <ol class="palette-list">
         <li
           v-for="entry in store.palette"
@@ -64,6 +82,8 @@ const store = useProjectStore()
   border-bottom: 1px solid var(--border);
 }
 .palette-header span { color: var(--muted); font-size: 11px; }
+.palette-sort { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center; padding: 10px 14px 0; color: var(--muted); font-size: 11px; }
+.merge-controls { display: grid; grid-template-columns: 1fr auto; gap: 6px; margin-bottom: 8px; }
 .palette-body { padding: 10px; }
 .palette-help { padding: 2px 3px 10px; }
 .palette-list { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }

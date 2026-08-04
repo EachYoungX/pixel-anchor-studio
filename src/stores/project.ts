@@ -1,9 +1,10 @@
-import { computed, markRaw, reactive, ref, toRaw } from 'vue'
+import { computed, markRaw, reactive, ref, toRaw, watch } from 'vue'
 import { defineStore } from 'pinia'
 import { hexToRgba, rgbaToHex } from '@/core/color'
 import { calculateOutputDimensions } from '@/core/dimensions'
 import { loadHtmlImage, loadSourceFile, imageToImageData } from '@/core/image/load'
 import { buildPalette } from '@/core/palette'
+import { mergeSimilarColors } from '@/core/processing/palette-merge'
 import { base64ToBytes, bytesToBase64 } from '@/core/export/project'
 import { runProcessing } from '@/core/worker-client'
 import type {
@@ -13,6 +14,8 @@ import type {
   PaletteEntry,
   PixelResult,
   PixelTool,
+  MergeStrength,
+  PaletteSortMode,
   ProcessingSettings,
   Rect,
   ScaleSettings,
@@ -74,6 +77,8 @@ export const useProjectStore = defineStore('project', () => {
   const colorCodes = ref<Record<string, string>>({})
   const palette = ref<PaletteEntry[]>([])
   const selectedColor = ref('#202124')
+  const mergeStrength = ref<MergeStrength>('off')
+  const paletteSort = ref<PaletteSortMode>('count-desc')
   const editTarget = ref<EditTarget>('crop')
   const pixelTool = ref<PixelTool>('brush')
   const isProcessing = ref(false)
@@ -102,12 +107,19 @@ export const useProjectStore = defineStore('project', () => {
 
   function refreshPalette(): void {
     const built = buildPalette(result.value, colorCodes.value)
-    palette.value = built.entries
+    palette.value = [...built.entries].sort((a, b) => {
+      if (paletteSort.value === 'code') return a.code.localeCompare(b.code)
+      if (paletteSort.value === 'lightness') return (a.rgba[0] + a.rgba[1] + a.rgba[2]) - (b.rgba[0] + b.rgba[1] + b.rgba[2])
+      if (paletteSort.value === 'hue') return Math.atan2(a.rgba[1] - a.rgba[2], a.rgba[0] - a.rgba[1]) - Math.atan2(b.rgba[1] - b.rgba[2], b.rgba[0] - b.rgba[1])
+      return b.count - a.count
+    })
     colorCodes.value = built.codeMap
     if (palette.value.length > 0 && !palette.value.some((entry) => entry.hex === selectedColor.value)) {
       selectedColor.value = palette.value.find((entry) => entry.rgba[3] > 0)?.hex ?? '#202124'
     }
   }
+
+  watch(paletteSort, refreshPalette)
 
   async function importImage(file: File): Promise<void> {
     const loaded = await loadSourceFile(file)
@@ -280,6 +292,15 @@ export const useProjectStore = defineStore('project', () => {
     refreshPalette()
   }
 
+  function mergeSimilar(): void {
+    if (!result.value || mergeStrength.value === 'off') return
+    pushHistory()
+    const merged = mergeSimilarColors(result.value, mergeStrength.value)
+    result.value = markRaw(merged.result)
+    refreshPalette()
+    status.value = merged.before === merged.after ? '没有找到符合条件的相近色' : `已合并相近色：${merged.before} 色 → ${merged.after} 色`
+  }
+
   function undo(): void {
     if (!result.value || history.value.length === 0) return
     future.value.push(cloneResult(result.value))
@@ -356,6 +377,8 @@ export const useProjectStore = defineStore('project', () => {
     result,
     palette,
     selectedColor,
+    mergeStrength,
+    paletteSort,
     editTarget,
     pixelTool,
     isProcessing,
@@ -379,6 +402,7 @@ export const useProjectStore = defineStore('project', () => {
     process,
     applyTool,
     mergeColor,
+    mergeSimilar,
     undo,
     redo,
     serialize,
