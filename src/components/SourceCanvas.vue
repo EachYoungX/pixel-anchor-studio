@@ -5,6 +5,7 @@ import type { Rect } from '@/types/project'
 
 const store = useProjectStore()
 const host = ref<HTMLDivElement | null>(null)
+const tools = ref<HTMLDivElement | null>(null)
 const canvas = ref<HTMLCanvasElement | null>(null)
 const showGrid = ref(true)
 const isPointerInside = ref(false)
@@ -45,7 +46,8 @@ const activeRect = computed(() => (store.editTarget === 'anchor' ? store.anchor 
 function resizeCanvas(): void {
   if (!host.value || !canvas.value) return
   const width = Math.max(320, Math.floor(host.value.clientWidth))
-  const height = Math.max(400, Math.min(620, Math.floor(window.innerHeight * 0.56)))
+  const toolbarHeight = tools.value?.offsetHeight ?? 0
+  const height = Math.max(320, Math.floor(host.value.clientHeight - toolbarHeight))
   const dpr = Math.min(window.devicePixelRatio || 1, 2)
   canvasCssSize = { width, height }
   canvas.value.width = Math.floor(width * dpr)
@@ -161,10 +163,14 @@ function drawRect(context: CanvasRenderingContext2D, rect: Rect, active: boolean
   context.textBaseline = 'middle'
   const labelWidth = context.measureText(label).width + 12
   const labelHeight = 20
-  const labelY = borderY >= labelHeight ? borderY - labelHeight : borderY
-  context.fillRect(Math.floor(borderX), Math.floor(labelY), Math.ceil(labelWidth), labelHeight)
-  context.fillStyle = '#FFFFFF'
-  context.fillText(label, Math.floor(borderX + 6), Math.floor(labelY + labelHeight / 2))
+  const labelX = Math.floor(borderX)
+  const labelY = Math.floor(borderY - labelHeight)
+  const labelVisible = labelX >= 0 && labelY >= 0 && labelX + labelWidth <= canvasCssSize.width && labelY + labelHeight <= canvasCssSize.height
+  if (labelVisible) {
+    context.fillRect(labelX, labelY, Math.ceil(labelWidth), labelHeight)
+    context.fillStyle = '#FFFFFF'
+    context.fillText(label, labelX + 6, labelY + labelHeight / 2)
+  }
 
   if (active) {
     const handleSize = 8
@@ -390,9 +396,9 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="host" class="source-canvas-host">
-    <div class="canvas-tools">
+    <div ref="tools" class="canvas-tools">
       <span>当前编辑：{{ store.editTarget === 'crop' ? '裁剪框' : '锚点框' }}</span>
-      <span class="canvas-actions"><button class="button button-small" type="button" @click="resetViewport">适应窗口</button><span>{{ Math.round(viewport.zoom * 100) }}%</span><label><input v-model="showGrid" type="checkbox" /> 显示网格</label></span>
+      <span class="canvas-actions"><button class="button button-small" type="button" @click="resetViewport">恢复视图</button><label><input v-model="showGrid" type="checkbox" /> 显示网格</label></span>
     </div>
     <canvas
       ref="canvas"
@@ -412,7 +418,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.source-canvas-host { position: relative; min-width: 0; background: #e9ebee; }
+.source-canvas-host { position: relative; height: 100%; min-width: 0; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); background: #e9ebee; }
 .canvas-tools {
   display: flex;
   align-items: center;

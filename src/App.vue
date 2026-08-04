@@ -7,6 +7,7 @@ import PalettePanel from '@/components/PalettePanel.vue'
 import { ref } from 'vue'
 import { useProjectStore } from '@/stores/project'
 import BeadWorkspace from '@/components/bead/BeadWorkspace.vue'
+import BeadSettingsPanel from '@/components/bead/BeadSettingsPanel.vue'
 import type { WorkspaceMode } from '@/types/project'
 import { useGlobalShortcuts } from '@/composables/useGlobalShortcuts'
 
@@ -26,7 +27,7 @@ useGlobalShortcuts()
       <template v-if="workspaceMode === 'pixel'">
         <SettingsPanel class="panel panel-left" />
         <main class="main-stage">
-        <section class="stage-card">
+        <section class="stage-page">
           <div class="stage-heading">
             <div>
               <h2>原图与网格</h2>
@@ -36,21 +37,25 @@ useGlobalShortcuts()
               输出 {{ store.outputDimensions.width }} × {{ store.outputDimensions.height }}
             </span>
           </div>
-          <SourceCanvas />
+          <div class="stage-page-body"><SourceCanvas /></div>
         </section>
-        <section class="stage-card">
+        <section class="stage-page">
           <div class="stage-heading">
             <div>
               <h2>像素结果</h2>
               <p>点击像素进行基础修正，处理结果始终保留为逻辑像素矩阵。</p>
             </div>
           </div>
-          <PixelPreview />
+          <div class="stage-page-body"><PixelPreview /></div>
         </section>
         </main>
-        <PalettePanel class="panel panel-right" />
+        <PalettePanel class="panel panel-right" mode="edit" />
       </template>
-      <BeadWorkspace v-else class="bead-workspace-stage" />
+      <template v-else>
+        <BeadSettingsPanel class="panel panel-left" />
+        <BeadWorkspace class="main-stage" />
+        <PalettePanel class="panel panel-right" mode="bead" />
+      </template>
     </div>
     <footer class="status-bar">
       <span>{{ store.status }}</span>

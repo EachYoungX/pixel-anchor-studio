@@ -1,7 +1,13 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useProjectStore } from '@/stores/project'
 
 const store = useProjectStore()
+const snapHelp = computed(() => {
+  if (store.scale.snapMode === 'source-pixel') return '框体按原图的单个像素移动或调整。适合照片、插画和需要精细定位的裁剪或特征框选。'
+  if (store.scale.snapMode === 'target-cell') return '框体按结果中的一个像素格移动。适合规则色块、放大的像素图或需要整格对齐的范围。'
+  return '不进行整数吸附，允许更细的自由调整。适合高倍率观察或网格相位微调。'
+})
 
 async function generate(): Promise<void> {
   try {
@@ -24,8 +30,8 @@ async function generate(): Promise<void> {
         <button class="button button-small" :class="{ 'button-active': store.cropSettings.mode === 'full' }" type="button" :disabled="!store.source" @click="store.useFullCrop">完整原图</button>
         <button class="button button-small" :class="{ 'button-active': store.cropSettings.mode === 'center-square' }" type="button" :disabled="!store.source" @click="store.useCenterSquareCrop">居中正方形</button>
       </div>
-      <p class="help">当前使用：{{ store.cropSettings.mode === 'full' ? '完整原图' : store.cropSettings.mode === 'center-square' ? '居中正方形' : '自由裁剪' }}</p>
-      <p class="help">在原图画布中拖动框体，拖动四角可调整范围。所有位置均按原图浮点坐标保存。</p>
+      <p class="help">选择原图中需要参与像素转换的内容。可以保留完整图片、快速截取中央正方形，也可以使用自由裁剪自行调整范围。</p>
+      <p class="help">{{ store.cropSettings.mode === 'custom' ? '拖动框体可移动范围，拖动四角可调整大小。切换到其他预设不会删除已经设置的自由裁剪范围。' : store.cropSettings.mode === 'full' ? '使用整张图片进行转换，不需要调整裁剪框。' : '使用图片中央能够容纳的最大正方形区域。' }}</p>
     </section>
 
     <section class="settings-section">
@@ -68,7 +74,7 @@ async function generate(): Promise<void> {
       <template v-else-if="store.scale.mode === 'anchor'">
         <button class="button button-small" :class="{ 'button-active': store.editTarget === 'anchor' }" type="button" :disabled="!store.source" @click="store.editTarget = 'anchor'">编辑特征锚点</button>
         <div class="field">
-          <span class="field-label">锚点占格</span>
+          <span class="field-label">参考部位在结果中的大小</span>
           <div class="anchor-options">
             <button
               v-for="value in 5"
@@ -82,7 +88,8 @@ async function generate(): Promise<void> {
             </button>
           </div>
         </div>
-        <p class="help">正方形框只用于估计视觉特征尺度，不会把框内物体压缩为正方形。可用于眼睛、花蕊、窗户、徽章等。</p>
+        <p class="help">用方框套住一个希望保留的关键部位，例如一只眼睛、花蕊、窗户或徽章，再选择它在结果中大约占几格。格数越大，保留的细节越多；格数越小，像素感越强。方框只用于确定像素大小，不会改变物体形状。</p>
+        <p class="help">当前为 {{ store.scale.anchorCells }} × {{ store.scale.anchorCells }}：参考部位在结果中大约占 {{ store.scale.anchorCells }} 格宽、{{ store.scale.anchorCells }} 格高。</p>
       </template>
 
       <template v-else>
@@ -110,7 +117,7 @@ async function generate(): Promise<void> {
         </label>
         <button class="button button-small" type="button" @click="store.resetGridPhase">偏移归零</button>
       </div>
-      <div class="field"><label for="snap-mode">框体吸附</label><select id="snap-mode" v-model="store.scale.snapMode" class="select"><option value="source-pixel">源图像素</option><option value="target-cell">目标网格</option><option value="off">关闭</option></select></div>
+      <div class="field"><label for="snap-mode">框体吸附</label><select id="snap-mode" v-model="store.scale.snapMode" class="select"><option value="source-pixel">原图像素（每次 1 px）</option><option value="target-cell">输出网格（每次 1 格）</option><option value="off">连续移动</option></select><p class="help">{{ snapHelp }}</p><p v-if="store.scale.mode === 'direct'" class="help">指定尺寸：推荐“原图像素”。</p><p v-else-if="store.scale.mode === 'anchor'" class="help">特征锚定：推荐“原图像素”。选择输出网格时，只影响锚点移动；调整大小仍保持精度。</p><p v-else class="help">伪像素对齐：推荐“输出网格”。</p></div>
     </section>
 
     <section class="settings-section">

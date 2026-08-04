@@ -158,6 +158,15 @@ function handleWheel(event: WheelEvent): void {
     viewport.value.scrollTop = logicalY * zoom.value - localY + padding
   })
 }
+
+function resetView(): void {
+  if (!store.result || !viewport.value) return
+  const available = Math.min(viewport.value.clientWidth - 36, viewport.value.clientHeight - 36)
+  const fit = Math.max(2, Math.floor(available / Math.max(store.result.width, store.result.height)))
+  zoom.value = zoomLevels.reduce((best, level) => (level <= fit ? level : best), zoomLevels[0])
+  viewport.value.scrollLeft = 0
+  viewport.value.scrollTop = 0
+}
 function handleKeyup(event: KeyboardEvent): void {
   if (event.code === 'Space') spacePressed = false
 }
@@ -194,16 +203,8 @@ onMounted(draw)
         </label>
       </div>
       <div class="tool-group">
-        <button class="button button-small" type="button" :disabled="!store.canUndo" :title="store.undoLabel" @click="store.undo">撤销</button>
-        <button class="button button-small" type="button" :disabled="!store.canRedo" :title="store.redoLabel" @click="store.redo">重做</button>
+        <button class="button button-small" type="button" @click="resetView">恢复视图</button>
       </div>
-      <label class="zoom-control">
-        缩放
-        <select v-model.number="zoom" class="select zoom-select">
-          <option v-for="level in zoomLevels" :key="level" :value="level">{{ level }}×</option>
-        </select>
-        <output>{{ zoom }}×</output>
-      </label>
     </div>
     <div ref="viewport" class="pixel-viewport" @wheel="handleWheel" @pointermove="handlePointerMove" @pointerup="handlePointerUp" @pointercancel="handlePointerUp">
       <canvas ref="canvas" class="pixel-canvas" @pointerdown="handlePointer" />
@@ -215,7 +216,7 @@ onMounted(draw)
 </template>
 
 <style scoped>
-.preview-shell { min-width: 0; }
+.preview-shell { height: 100%; min-width: 0; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); }
 .editor-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -229,7 +230,6 @@ onMounted(draw)
 .color-picker-label { display: flex; align-items: center; gap: 7px; color: #4f565e; font-size: 11px; }
 .color-picker { width: 30px; height: 26px; padding: 1px; border: 1px solid var(--border-strong); border-radius: 5px; background: #ffffff; }
 .color-picker-label code { color: #4b5158; font-size: 11px; }
-.zoom-control { margin-left: auto; display: grid; grid-template-columns: auto 100px 28px; align-items: center; gap: 7px; color: #4f565e; font-size: 11px; }
-.pixel-viewport { height: clamp(360px, 55vh, 620px); min-width: 0; overflow: auto; padding: 18px; background: #e9ebee; }
+.pixel-viewport { min-height: 0; min-width: 0; overflow: auto; padding: 18px; background: #e9ebee; }
 .pixel-canvas { display: block; margin: auto; background: #ffffff; touch-action: none; image-rendering: pixelated; cursor: crosshair; }
 </style>

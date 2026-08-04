@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useProjectStore } from '@/stores/project'
 
+const props = withDefaults(defineProps<{ mode?: 'edit' | 'bead' }>(), { mode: 'edit' })
 const store = useProjectStore()
 </script>
 
@@ -28,8 +29,8 @@ const store = useProjectStore()
     </div>
 
     <div v-else class="palette-body">
-      <p class="palette-help">点击条目选择画笔颜色。可将任意颜色合并到当前颜色。</p>
-      <div class="merge-controls">
+      <p class="palette-help">{{ props.mode === 'edit' ? '点击条目选择画笔颜色。可将任意颜色合并到当前颜色。' : '拼豆导出页只读显示颜色、色号和用量，不会修改当前像素结果。' }}</p>
+      <div v-if="props.mode === 'edit'" class="merge-controls">
         <select v-model="store.mergeStrength" class="select">
           <option value="off">自动合并：关闭</option>
           <option value="conservative">自动合并：保守</option>
@@ -44,7 +45,7 @@ const store = useProjectStore()
           :key="entry.hex"
           class="palette-item"
           :class="{ selected: store.selectedColor === entry.hex }"
-          @click="store.selectedColor = entry.hex"
+          @click="props.mode === 'edit' && (store.selectedColor = entry.hex)"
         >
           <span
             class="swatch"
@@ -56,7 +57,7 @@ const store = useProjectStore()
             <strong>{{ entry.hex }}</strong>
             <small>×{{ entry.count }}</small>
           </span>
-          <button
+          <button v-if="props.mode === 'edit'"
             class="button button-small merge-button"
             type="button"
             :disabled="store.selectedColor === entry.hex"

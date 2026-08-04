@@ -32,7 +32,7 @@ button:disabled { cursor: not-allowed; opacity: 0.48; }
   min-height: 0;
   overflow: hidden;
 }
-.workspace--bead { grid-template-columns: minmax(0, 1fr); }
+.workspace--bead { grid-template-columns: 292px minmax(0, 1fr) 286px; }
 .panel,
 .stage-card {
   background: var(--surface);
@@ -41,8 +41,9 @@ button:disabled { cursor: not-allowed; opacity: 0.48; }
 }
 .panel { min-width: 0; }
 .panel-left, .panel-right { min-height: 0; overflow: auto; }
-.main-stage { display: grid; gap: 12px; align-content: start; min-width: 0; min-height: 0; overflow: auto; }
-.bead-workspace-stage { min-height: 0; }
+.main-stage { display: grid; gap: 12px; align-content: start; min-width: 0; min-height: 0; height: 100%; overflow-y: auto; overflow-x: hidden; scroll-snap-type: y proximity; }
+.stage-page { min-height: calc(100% - 2px); display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); scroll-snap-align: start; }
+.stage-page-body { min-width: 0; min-height: 0; overflow: hidden; }
 .stage-card { overflow: hidden; }
 .stage-heading {
   min-height: 62px;
@@ -122,14 +123,15 @@ p { font-size: 12px; color: var(--muted); line-height: 1.55; }
 
 @media (max-width: 1180px) {
   .workspace { grid-template-columns: 270px minmax(420px, 1fr); }
-  .workspace--bead { grid-template-columns: minmax(0, 1fr); }
+  .workspace--bead { grid-template-columns: 270px minmax(420px, 1fr) 286px; }
   .panel-right { grid-column: 1 / -1; max-height: none; }
+  .workspace--bead .panel-right { grid-column: auto; }
 }
 @media (max-width: 820px) {
   html, body, #app { height: auto; min-height: 100%; overflow: auto; }
   body { min-height: 100vh; }
   .app-shell { height: auto; min-height: 100vh; display: flex; flex-direction: column; }
-  .workspace { display: flex; flex-direction: column; overflow: visible; }
+  .workspace, .workspace--bead { display: flex; flex-direction: column; overflow: visible; }
   .panel-left, .panel-right { max-height: none; }
   .main-stage { overflow: visible; }
   .main-stage { order: -1; }
