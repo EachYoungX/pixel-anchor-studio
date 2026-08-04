@@ -42,10 +42,12 @@ watch(() => props.open, (open) => { if (open) focusDialog() })
           <h3>快速开始</h3>
           <ol><li>导入图片并选择图像范围；</li><li>选择像素化方式，生成并编辑结果；</li><li>检查拼豆 PDF 分页或 SVG 总览；</li><li>从对应工作区导出文件。</li></ol>
           <h3>常用操作</h3>
-          <p><kbd>Ctrl / Command</kbd> + 滚轮缩放；</p>
-          <p><kbd>Ctrl / Command</kbd> + <kbd>Z</kbd> 撤销。</p>
-          <p>原图和像素结果可用空格加左键或中键平移；拼豆文档按视口中心缩放并通过普通滚动阅读；双击空白区域或点击“恢复视图”适应窗口；</p>
-
+          <p>位于原图与网格和像素结果区域：</p>
+          <p>缩放：<kbd>Ctrl / Command</kbd> + <kbd>滚轮</kbd></p>
+          <p>平移：<kbd>空格/space</kbd> 加 <kbd>左键</kbd> 或 <kbd>中键</kbd></p>
+          <p>全局：<kbd>Ctrl / Command</kbd> + <kbd>Z</kbd> 撤销</p>
+          <p>拼豆文档按视口中心缩放并通过普通滚动阅读</p>
+          <p>双击空白区域或点击“恢复视图”适应窗口</p>
         </section>
         <section v-else-if="activeTab === 'release'" class="about-section"><h3>最近更新</h3><ul><li v-for="note in latestReleaseNotes" :key="note">{{ note }}</li></ul><a href="https://github.com/EachYoungX/pixel-anchor-studio/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer">查看完整更新日志</a></section>
         <section v-else class="about-section"><h3>项目与许可</h3><p>图片处理全部在当前浏览器中完成，不会上传到服务器。</p><a href="https://github.com/EachYoungX/pixel-anchor-studio" target="_blank" rel="noreferrer">打开 GitHub 项目</a><a href="https://github.com/EachYoungX/pixel-anchor-studio/blob/main/LICENSE" target="_blank" rel="noreferrer">查看 MIT License</a></section>
