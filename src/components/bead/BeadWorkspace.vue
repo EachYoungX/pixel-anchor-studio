@@ -1,8 +1,26 @@
 <script setup lang="ts">
 import { useProjectStore } from '@/stores/project'
 import BeadPreview from '@/components/bead/BeadPreview.vue'
+import { exportPaletteCsv } from '@/core/export/csv'
+import { exportBeadPdf } from '@/core/export/pdf'
+import { exportBeadSvg } from '@/core/export/svg'
+import { sanitizeFilename } from '@/core/export/download'
 
 const store = useProjectStore()
+
+function baseName(): string { return sanitizeFilename(store.source?.name ?? 'pixel-art') }
+function saveSvg(): void {
+  if (!store.result || !store.canExportBead) return
+  exportBeadSvg(store.result, store.palette, `${baseName()}-bead-chart.svg`, store.bead.cellSize, store.bead.indexFromOne)
+}
+function savePdf(): void {
+  if (!store.result || !store.canExportBead) return
+  exportBeadPdf(store.result, store.palette, store.bead, `${baseName()}-bead-chart.pdf`)
+}
+function saveCsv(): void {
+  if (!store.result) return
+  exportPaletteCsv(store.palette, `${baseName()}-palette.csv`)
+}
 </script>
 
 <template>
@@ -32,6 +50,11 @@ const store = useProjectStore()
         <strong>{{ store.beadCount }} 个有色格</strong>
         <span>{{ store.palette.length }} 种颜色 · {{ Math.ceil(store.result.width / store.bead.pageColumns) * Math.ceil(store.result.height / store.bead.pageRows) }} 页</span>
         <p>颜色明细和合并操作位于右侧“颜色与用量”面板。</p>
+        <div class="export-actions">
+          <button class="button button-small" type="button" :disabled="!store.canExportBead" @click="saveSvg">导出 SVG</button>
+          <button class="button button-small" type="button" :disabled="!store.canExportBead" @click="savePdf">导出 PDF</button>
+          <button class="button button-small" type="button" @click="saveCsv">颜色 CSV</button>
+        </div>
       </section>
       <section class="bead-card bead-grid-card">
         <h3>拼豆网格预览</h3>
@@ -50,6 +73,7 @@ const store = useProjectStore()
 .bead-card { display: grid; gap: 14px; align-content: start; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-muted); }
 .bead-summary strong { font-size: 28px; color: var(--accent); }
 .bead-summary span { color: var(--muted); font-size: 12px; }
+.export-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .field { display: grid; gap: 6px; color: #3f454c; font-size: 12px; font-weight: 600; }
 .two-column { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .input { width: 100%; height: 33px; padding: 5px 8px; border: 1px solid var(--border-strong); border-radius: 7px; background: #fff; }
