@@ -110,7 +110,7 @@ async function generate(): Promise<void> {
         </label>
         <button class="button button-small" type="button" @click="store.resetGridPhase">偏移归零</button>
       </div>
-      <label class="checkbox-row"><span>移动框体时对齐目标网格</span><input v-model="store.scale.snapToGrid" type="checkbox" /></label>
+      <div class="field"><label for="snap-mode">框体吸附</label><select id="snap-mode" v-model="store.scale.snapMode" class="select"><option value="source-pixel">源图像素</option><option value="target-cell">目标网格</option><option value="off">关闭</option></select></div>
     </section>
 
     <section class="settings-section">

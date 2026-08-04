@@ -32,6 +32,7 @@ const defaultScale = (): ScaleSettings => ({
   offsetX: 0,
   offsetY: 0,
   snapToGrid: false,
+  snapMode: 'source-pixel',
 })
 
 const defaultProcessing = (): ProcessingSettings => ({
@@ -188,14 +189,17 @@ export const useProjectStore = defineStore('project', () => {
 
   function updateCrop(next: Rect): void {
     if (!source.value) return
-    Object.assign(crop, clampRect(snapRectToSourcePixels(next), source.value.width, source.value.height, 8))
+    const snapped = scale.snapMode === 'source-pixel' ? snapRectToSourcePixels(next) : next
+    Object.assign(crop, clampRect(snapped, source.value.width, source.value.height, 8))
     cropSettings.mode = 'custom'
   }
 
   function updateAnchor(next: Rect): void {
     if (!source.value) return
     const square = Math.max(4, Math.min(next.width, next.height))
-    Object.assign(anchor, clampRect(snapRectToSourcePixels({ ...next, width: square, height: square }), source.value.width, source.value.height, 4))
+    const nextAnchor = { ...next, width: square, height: square }
+    const snapped = scale.snapMode === 'source-pixel' ? snapRectToSourcePixels(nextAnchor) : nextAnchor
+    Object.assign(anchor, clampRect(snapped, source.value.width, source.value.height, 4))
   }
 
   function useCustomCrop(): void {

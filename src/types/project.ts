@@ -6,6 +6,7 @@ export type CleanupStrength = 'off' | 'light' | 'medium' | 'strong'
 export type MergeStrength = 'off' | 'conservative' | 'balanced' | 'strong'
 export type PaletteSortMode = 'count-desc' | 'hue' | 'lightness' | 'code'
 export type WorkspaceMode = 'pixel' | 'bead'
+export type SnapMode = 'source-pixel' | 'target-cell' | 'off'
 export type EditTarget = 'crop' | 'anchor'
 export type PixelTool = 'brush' | 'eyedropper' | 'fill' | 'eraser'
 
@@ -37,6 +38,7 @@ export interface ScaleSettings {
   offsetX: number
   offsetY: number
   snapToGrid?: boolean
+  snapMode?: SnapMode
 }
 
 export interface ProcessingSettings {

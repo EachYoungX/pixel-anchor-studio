@@ -28,6 +28,10 @@ interface DragState {
   startX: number
   startY: number
   startRect: Rect
+  snapStepX: number
+  snapStepY: number
+  snapOriginX: number
+  snapOriginY: number
 }
 
 let view: ViewTransform = { scale: 1, offsetX: 0, offsetY: 0 }
@@ -241,7 +245,7 @@ function onPointerDown(event: PointerEvent): void {
   if (!store.source || !canvas.value) return
   const point = pointerPosition(event)
   if (spacePressed || event.button === 1) {
-    drag = { action: 'pan', handle: null, startX: point.x, startY: point.y, startRect: { x: viewport.panX, y: viewport.panY, width: 0, height: 0 } }
+    drag = { action: 'pan', handle: null, startX: point.x, startY: point.y, startRect: { x: viewport.panX, y: viewport.panY, width: 0, height: 0 }, snapStepX: 1, snapStepY: 1, snapOriginX: 0, snapOriginY: 0 }
     canvas.value.setPointerCapture(event.pointerId)
     return
   }
@@ -254,6 +258,10 @@ function onPointerDown(event: PointerEvent): void {
     startX: point.x,
     startY: point.y,
     startRect: current,
+    snapStepX: store.effectiveCrop.width / Math.max(1, store.outputDimensions.width),
+    snapStepY: store.effectiveCrop.height / Math.max(1, store.outputDimensions.height),
+    snapOriginX: store.effectiveCrop.x,
+    snapOriginY: store.effectiveCrop.y,
   }
   canvas.value.setPointerCapture(event.pointerId)
 }
@@ -301,14 +309,14 @@ function onPointerMove(event: PointerEvent): void {
   let next: Rect
   if (drag.action === 'move') {
     next = { ...drag.startRect, x: drag.startRect.x + dx, y: drag.startRect.y + dy }
-    if (store.scale.snapToGrid) {
-      const stepX = store.effectiveCrop.width / Math.max(1, store.outputDimensions.width)
-      const stepY = store.effectiveCrop.height / Math.max(1, store.outputDimensions.height)
-      next.x = store.effectiveCrop.x + Math.round((next.x - store.effectiveCrop.x) / stepX) * stepX
-      next.y = store.effectiveCrop.y + Math.round((next.y - store.effectiveCrop.y) / stepY) * stepY
-    }
   } else {
     next = resizedRect(drag.startRect, drag.handle, dx, dy)
+  }
+  if (store.scale.snapMode === 'target-cell') {
+    next.x = drag.snapOriginX + Math.round((next.x - drag.snapOriginX) / drag.snapStepX) * drag.snapStepX
+    next.y = drag.snapOriginY + Math.round((next.y - drag.snapOriginY) / drag.snapStepY) * drag.snapStepY
+    next.width = Math.max(drag.snapStepX, Math.round(next.width / drag.snapStepX) * drag.snapStepX)
+    next.height = Math.max(drag.snapStepY, Math.round(next.height / drag.snapStepY) * drag.snapStepY)
   }
   if (store.editTarget === 'anchor') store.updateAnchor(next)
   else store.updateCrop(next)
