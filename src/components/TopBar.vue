@@ -7,10 +7,13 @@ import { exportPng } from '@/core/export/png'
 import { exportProjectFile, parseProjectFile } from '@/core/export/project'
 import { exportBeadSvg } from '@/core/export/svg'
 import { useProjectStore } from '@/stores/project'
+import BrandLogo from '@/components/BrandLogo.vue'
+import AboutDialog from '@/components/AboutDialog.vue'
 
 const store = useProjectStore()
 const imageInput = ref<HTMLInputElement | null>(null)
 const projectInput = ref<HTMLInputElement | null>(null)
+const aboutOpen = ref(false)
 
 function baseName(): string {
   return sanitizeFilename(store.source?.name ?? 'pixel-art')
@@ -74,8 +77,11 @@ function saveCsv(): void {
 <template>
   <header class="top-bar">
     <div class="brand">
-      <h1>像素锚点</h1>
-      <span>通用像素转换与拼豆图生成</span>
+      <BrandLogo />
+      <button class="brand-button" type="button" title="关于工具" @click="aboutOpen = true">
+        <strong>锚点像素工作台</strong>
+        <span>图片像素化与拼豆图工具</span>
+      </button>
     </div>
     <nav class="top-actions" aria-label="文件和导出操作">
       <button class="button" type="button" @click="imageInput?.click()">导入图片</button>
@@ -92,6 +98,7 @@ function saveCsv(): void {
     </nav>
     <input ref="imageInput" class="hidden-input" type="file" accept="image/*" @change="handleImage" />
     <input ref="projectInput" class="hidden-input" type="file" accept=".json,application/json" @change="handleProject" />
+    <AboutDialog :open="aboutOpen" @close="aboutOpen = false" />
   </header>
 </template>
 
@@ -106,8 +113,10 @@ function saveCsv(): void {
   border-bottom: 1px solid var(--border);
   background: #ffffff;
 }
-.brand { display: flex; align-items: baseline; gap: 10px; white-space: nowrap; }
-.brand span { color: var(--muted); font-size: 12px; }
+.brand { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+.brand-button { display: grid; gap: 2px; padding: 0; border: 0; background: transparent; text-align: left; }
+.brand-button strong { color: var(--text); font-size: 21px; font-weight: 680; }
+.brand-button span { color: var(--muted); font-size: 12px; }
 .top-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
 .separator { width: 1px; margin: 4px 3px; background: var(--border); }
 .hidden-input { display: none; }
