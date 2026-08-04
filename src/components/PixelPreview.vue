@@ -6,6 +6,8 @@ import type { PixelTool } from '@/types/project'
 const store = useProjectStore()
 const canvas = ref<HTMLCanvasElement | null>(null)
 const zoom = ref(8)
+const painting = ref(false)
+let lastPixel = ''
 const toolOptions: Array<[PixelTool, string]> = [
   ['brush', '画笔'],
   ['eyedropper', '吸管'],
@@ -69,15 +71,41 @@ function draw(): void {
   }
 }
 
-function handlePointer(event: PointerEvent): void {
-  if (!store.result || !canvas.value) return
+function pixelFromPointer(event: PointerEvent): { x: number; y: number } | null {
+  if (!store.result || !canvas.value) return null
   const bounds = canvas.value.getBoundingClientRect()
   const scaleX = canvas.value.width / bounds.width
   const scaleY = canvas.value.height / bounds.height
   const x = Math.floor(((event.clientX - bounds.left) * scaleX) / zoom.value)
   const y = Math.floor(((event.clientY - bounds.top) * scaleY) / zoom.value)
-  store.applyTool(x, y)
+  return { x, y }
+}
+
+function handlePointer(event: PointerEvent): void {
+  const pixel = pixelFromPointer(event)
+  if (!pixel) return
+  painting.value = true
+  lastPixel = `${pixel.x},${pixel.y}`
+  canvas.value?.setPointerCapture(event.pointerId)
+  store.applyTool(pixel.x, pixel.y)
   draw()
+}
+
+function handlePointerMove(event: PointerEvent): void {
+  if (!painting.value) return
+  const pixel = pixelFromPointer(event)
+  if (!pixel) return
+  const key = `${pixel.x},${pixel.y}`
+  if (key === lastPixel) return
+  lastPixel = key
+  store.applyTool(pixel.x, pixel.y, false)
+  draw()
+}
+
+function handlePointerUp(event: PointerEvent): void {
+  if (canvas.value?.hasPointerCapture(event.pointerId)) canvas.value.releasePointerCapture(event.pointerId)
+  painting.value = false
+  lastPixel = ''
 }
 
 function handleKeydown(event: KeyboardEvent): void {
@@ -146,7 +174,7 @@ onMounted(draw)
       </label>
     </div>
     <div class="pixel-viewport" @wheel="handleWheel">
-      <canvas ref="canvas" class="pixel-canvas" @pointerdown="handlePointer" />
+      <canvas ref="canvas" class="pixel-canvas" @pointerdown="handlePointer" @pointermove="handlePointerMove" @pointerup="handlePointerUp" @pointercancel="handlePointerUp" />
     </div>
   </div>
   <div v-else class="empty-state">

@@ -319,11 +319,11 @@ export const useProjectStore = defineStore('project', () => {
     refreshPalette()
   }
 
-  function applyTool(x: number, y: number): void {
+  function applyTool(x: number, y: number, record = true): void {
     if (pixelTool.value === 'eyedropper') pickPixel(x, y)
-    else if (pixelTool.value === 'fill') fillPixel(x, y)
-    else if (pixelTool.value === 'eraser') setPixel(x, y, '#00000000')
-    else setPixel(x, y)
+    else if (pixelTool.value === 'fill') { if (record) fillPixel(x, y) }
+    else if (pixelTool.value === 'eraser') setPixel(x, y, '#00000000', record)
+    else setPixel(x, y, selectedColor.value, record)
   }
 
   function mergeColor(fromHex: string, toHex: string): void {
