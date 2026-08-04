@@ -313,7 +313,8 @@ function onPointerMove(event: PointerEvent): void {
   } else {
     next = resizedRect(drag.startRect, drag.handle, dx, dy)
   }
-  if (store.scale.snapMode === 'target-cell') {
+  const canTargetSnap = store.scale.snapMode === 'target-cell' && !(store.editTarget === 'anchor' && drag.action === 'resize')
+  if (canTargetSnap) {
     next.x = drag.snapOriginX + Math.round((next.x - drag.snapOriginX) / drag.snapStepX) * drag.snapStepX
     next.y = drag.snapOriginY + Math.round((next.y - drag.snapOriginY) / drag.snapStepY) * drag.snapStepY
     next.width = Math.max(drag.snapStepX, Math.round(next.width / drag.snapStepX) * drag.snapStepX)
