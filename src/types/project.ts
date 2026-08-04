@@ -5,6 +5,7 @@ export type SamplingMode = 'average' | 'median' | 'dominant' | 'nearest'
 export type CleanupStrength = 'off' | 'light' | 'medium' | 'strong'
 export type MergeStrength = 'off' | 'conservative' | 'balanced' | 'strong'
 export type PaletteSortMode = 'count-desc' | 'hue' | 'lightness' | 'code'
+export type WorkspaceMode = 'pixel' | 'bead'
 export type EditTarget = 'crop' | 'anchor'
 export type PixelTool = 'brush' | 'eyedropper' | 'fill' | 'eraser'
 

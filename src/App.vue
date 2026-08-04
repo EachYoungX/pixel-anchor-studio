@@ -7,9 +7,10 @@ import PalettePanel from '@/components/PalettePanel.vue'
 import { ref } from 'vue'
 import { useProjectStore } from '@/stores/project'
 import BeadWorkspace from '@/components/bead/BeadWorkspace.vue'
+import type { WorkspaceMode } from '@/types/project'
 
 const store = useProjectStore()
-const workspaceMode = ref<'pixel' | 'bead'>('pixel')
+const workspaceMode = ref<WorkspaceMode>('pixel')
 </script>
 
 <template>
