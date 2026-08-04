@@ -71,6 +71,11 @@ export interface PixelResult {
   data: Uint8ClampedArray
 }
 
+export interface HistoryEntry {
+  label: string
+  result: PixelResult
+}
+
 export interface PaletteEntry {
   code: string
   hex: string

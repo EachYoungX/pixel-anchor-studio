@@ -11,6 +11,7 @@ import type {
   BeadSettings,
   CropMode,
   EditTarget,
+  HistoryEntry,
   PaletteEntry,
   PixelResult,
   PixelTool,
@@ -104,8 +105,12 @@ export const useProjectStore = defineStore('project', () => {
   const isProcessing = ref(false)
   const status = ref('导入图片后开始处理')
   const lastDurationMs = ref(0)
-  const history = ref<PixelResult[]>([])
-  const future = ref<PixelResult[]>([])
+  const history = ref<HistoryEntry[]>([])
+  const future = ref<HistoryEntry[]>([])
+  const canUndo = computed(() => history.value.length > 0)
+  const canRedo = computed(() => future.value.length > 0)
+  const undoLabel = computed(() => history.value[history.value.length - 1]?.label ?? '撤销')
+  const redoLabel = computed(() => future.value[future.value.length - 1]?.label ?? '重做')
   let latestProcessId = 0
   let sourceRevision = 0
   const sourceId = ref('source-0')
@@ -294,20 +299,21 @@ export const useProjectStore = defineStore('project', () => {
     }
   }
 
-  function pushHistory(): void {
+  function pushHistory(label: string): void {
     if (!result.value) return
-    history.value.push(cloneResult(result.value))
+    history.value.push({ label, result: cloneResult(result.value) })
     if (history.value.length > 20) history.value.shift()
     future.value = []
   }
 
-  function setPixel(x: number, y: number, color = selectedColor.value, record = true): void {
+  function setPixel(x: number, y: number, color = selectedColor.value, record = true, label = '像素编辑'): void {
     if (!result.value || x < 0 || y < 0 || x >= result.value.width || y >= result.value.height) return
-    if (record) pushHistory()
-    cachedProcessKey = ''
-    cachedProcessResult = null
     const rgba = hexToRgba(color)
     const offset = (y * result.value.width + x) * 4
+    if (rgba.every((value, index) => value === result.value!.data[offset + index])) return
+    if (record) pushHistory(label)
+    cachedProcessKey = ''
+    cachedProcessResult = null
     result.value.data[offset] = rgba[0]
     result.value.data[offset + 1] = rgba[1]
     result.value.data[offset + 2] = rgba[2]
@@ -329,9 +335,6 @@ export const useProjectStore = defineStore('project', () => {
 
   function fillPixel(x: number, y: number): void {
     if (!result.value || x < 0 || y < 0 || x >= result.value.width || y >= result.value.height) return
-    pushHistory()
-    cachedProcessKey = ''
-    cachedProcessResult = null
     const width = result.value.width
     const height = result.value.height
     const start = y * width + x
@@ -344,6 +347,9 @@ export const useProjectStore = defineStore('project', () => {
     ]
     const replacement = hexToRgba(selectedColor.value)
     if (target.every((value, index) => value === replacement[index])) return
+    pushHistory('填充')
+    cachedProcessKey = ''
+    cachedProcessResult = null
     const visited = new Uint8Array(width * height)
     const queue = [start]
     while (queue.length > 0) {
@@ -366,17 +372,15 @@ export const useProjectStore = defineStore('project', () => {
   function applyTool(x: number, y: number, record = true): void {
     if (pixelTool.value === 'eyedropper') pickPixel(x, y)
     else if (pixelTool.value === 'fill') { if (record) fillPixel(x, y) }
-    else if (pixelTool.value === 'eraser') setPixel(x, y, '#00000000', record)
-    else setPixel(x, y, selectedColor.value, record)
+    else if (pixelTool.value === 'eraser') setPixel(x, y, '#00000000', record, '橡皮擦')
+    else setPixel(x, y, selectedColor.value, record, '画笔')
   }
 
   function mergeColor(fromHex: string, toHex: string): void {
     if (!result.value || fromHex === toHex) return
-    pushHistory()
-    cachedProcessKey = ''
-    cachedProcessResult = null
     const from = hexToRgba(fromHex)
     const to = hexToRgba(toHex)
+    let changed = false
     for (let offset = 0; offset < result.value.data.length; offset += 4) {
       if (
         result.value.data[offset] === from[0] &&
@@ -384,18 +388,35 @@ export const useProjectStore = defineStore('project', () => {
         result.value.data[offset + 2] === from[2] &&
         result.value.data[offset + 3] === from[3]
       ) {
-        result.value.data.set(to, offset)
+        changed = true
+        break
       }
+    }
+    if (!changed) return
+    pushHistory('合并颜色')
+    cachedProcessKey = ''
+    cachedProcessResult = null
+    for (let offset = 0; offset < result.value.data.length; offset += 4) {
+      if (
+        result.value.data[offset] === from[0] &&
+        result.value.data[offset + 1] === from[1] &&
+        result.value.data[offset + 2] === from[2] &&
+        result.value.data[offset + 3] === from[3]
+      ) result.value.data.set(to, offset)
     }
     refreshPalette()
   }
 
   function mergeSimilar(): void {
     if (!result.value || mergeStrength.value === 'off') return
-    pushHistory()
+    const merged = mergeSimilarColors(result.value, mergeStrength.value)
+    if (merged.before === merged.after) {
+      status.value = '没有找到符合条件的相近色'
+      return
+    }
+    pushHistory('合并相近色')
     cachedProcessKey = ''
     cachedProcessResult = null
-    const merged = mergeSimilarColors(result.value, mergeStrength.value)
     result.value = markRaw(merged.result)
     refreshPalette()
     status.value = merged.before === merged.after ? '没有找到符合条件的相近色' : `已合并相近色：${merged.before} 色 → ${merged.after} 色`
@@ -403,8 +424,9 @@ export const useProjectStore = defineStore('project', () => {
 
   function undo(): void {
     if (!result.value || history.value.length === 0) return
-    future.value.push(cloneResult(result.value))
-    result.value = markRaw(history.value.pop()!)
+    const previous = history.value.pop()!
+    future.value.push({ label: previous.label, result: cloneResult(result.value) })
+    result.value = markRaw(previous.result)
     cachedProcessKey = ''
     cachedProcessResult = null
     refreshPalette()
@@ -412,8 +434,9 @@ export const useProjectStore = defineStore('project', () => {
 
   function redo(): void {
     if (!result.value || future.value.length === 0) return
-    history.value.push(cloneResult(result.value))
-    result.value = markRaw(future.value.pop()!)
+    const next = future.value.pop()!
+    history.value.push({ label: next.label, result: cloneResult(result.value) })
+    result.value = markRaw(next.result)
     cachedProcessKey = ''
     cachedProcessResult = null
     refreshPalette()
@@ -491,6 +514,10 @@ export const useProjectStore = defineStore('project', () => {
     lastDurationMs,
     history,
     future,
+    canUndo,
+    canRedo,
+    undoLabel,
+    redoLabel,
     outputDimensions,
     canProcess,
     beadCount,

@@ -133,18 +133,6 @@ function handleKeydown(event: KeyboardEvent): void {
   const target = event.target as HTMLElement | null
   if (target && ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName)) return
   if (event.code === 'Space') { spacePressed = true; event.preventDefault(); return }
-  const modifier = event.ctrlKey || event.metaKey
-  if (!modifier) return
-  if (event.key.toLowerCase() === 'z' && event.shiftKey) {
-    event.preventDefault()
-    store.redo()
-  } else if (event.key.toLowerCase() === 'z') {
-    event.preventDefault()
-    store.undo()
-  } else if (event.key.toLowerCase() === 'y') {
-    event.preventDefault()
-    store.redo()
-  }
 }
 
 function handleWheel(event: WheelEvent): void {
@@ -206,8 +194,8 @@ onMounted(draw)
         </label>
       </div>
       <div class="tool-group">
-        <button class="button button-small" type="button" :disabled="store.history.length === 0" @click="store.undo">撤销</button>
-        <button class="button button-small" type="button" :disabled="store.future.length === 0" @click="store.redo">重做</button>
+        <button class="button button-small" type="button" :disabled="!store.canUndo" :title="store.undoLabel" @click="store.undo">撤销</button>
+        <button class="button button-small" type="button" :disabled="!store.canRedo" :title="store.redoLabel" @click="store.redo">重做</button>
       </div>
       <label class="zoom-control">
         缩放

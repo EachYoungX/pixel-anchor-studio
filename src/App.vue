@@ -8,9 +8,11 @@ import { ref } from 'vue'
 import { useProjectStore } from '@/stores/project'
 import BeadWorkspace from '@/components/bead/BeadWorkspace.vue'
 import type { WorkspaceMode } from '@/types/project'
+import { useGlobalShortcuts } from '@/composables/useGlobalShortcuts'
 
 const store = useProjectStore()
 const workspaceMode = ref<WorkspaceMode>('pixel')
+useGlobalShortcuts()
 </script>
 
 <template>

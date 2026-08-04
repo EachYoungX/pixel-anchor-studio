@@ -81,6 +81,8 @@ function saveCsv(): void {
       <button class="button" type="button" @click="imageInput?.click()">导入图片</button>
       <button class="button" type="button" @click="projectInput?.click()">打开项目</button>
       <button class="button" type="button" :disabled="!store.source" @click="saveProject">保存项目</button>
+      <button class="button" type="button" :disabled="!store.canUndo" :title="`撤销：${store.undoLabel}`" @click="store.undo">撤销</button>
+      <button class="button" type="button" :disabled="!store.canRedo" :title="`重做：${store.redoLabel}`" @click="store.redo">重做</button>
       <span class="separator" aria-hidden="true" />
       <button class="button" type="button" :disabled="!store.result" @click="savePng(1)">PNG原尺寸</button>
       <button class="button" type="button" :disabled="!store.result" @click="savePng(8)">PNG八倍</button>
