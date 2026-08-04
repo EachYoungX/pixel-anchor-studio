@@ -11,6 +11,7 @@ const viewport = ref<HTMLDivElement | null>(null)
 const zoomLevels = [1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24]
 const viewportController = useViewportController({ initialZoom: 8, minZoom: 1, maxZoom: 24 })
 const zoom = viewportController.zoom
+const showGrid = ref(true)
 const painting = ref(false)
 const panning = ref(false)
 let panStart = { x: 0, y: 0, scrollLeft: 0, scrollTop: 0 }
@@ -71,7 +72,7 @@ function draw(): void {
     }
   }
 
-  if (cell >= 6) {
+  if (showGrid.value && cell >= 6) {
     context.strokeStyle = 'rgba(70, 75, 82, 0.26)'
     context.lineWidth = 1
     for (let x = 0; x <= result.width; x += 1) {
@@ -186,7 +187,7 @@ function handleKeyup(event: KeyboardEvent): void {
 }
 
 watch(
-  () => [store.result, store.palette, zoom.value],
+  () => [store.result, store.palette, zoom.value, showGrid.value],
   () => nextTick(draw),
   { deep: false },
 )
@@ -208,7 +209,7 @@ onBeforeUnmount(() => observer?.disconnect())
 <template>
   <div ref="editorShell" v-if="store.result" class="preview-shell" tabindex="0" @keydown="handleKeydown" @keyup="handleKeyup">
     <div class="editor-toolbar">
-      <div class="tool-group">
+      <div class="tool-group editor-tools">
         <button
           v-for="tool in toolOptions"
           :key="tool[0]"
@@ -220,15 +221,16 @@ onBeforeUnmount(() => observer?.disconnect())
           {{ tool[1] }}
         </button>
       </div>
-      <div class="tool-group">
+      <div class="tool-group color-tools">
         <label class="color-picker-label">
           当前颜色
           <input v-model="selectedColorForInput" class="color-picker" type="color" />
           <code>{{ store.selectedColor }}</code>
         </label>
       </div>
-      <div class="tool-group">
+      <div class="tool-group view-actions">
         <button class="button button-small" type="button" @click="resetView">恢复视图</button>
+        <label class="grid-toggle"><input v-model="showGrid" type="checkbox" /> 显示网格</label>
       </div>
     </div>
     <div ref="viewport" class="pixel-viewport" @wheel="handleWheel" @pointermove="handlePointerMove" @pointerup="handlePointerUp" @pointercancel="handlePointerUp" @dblclick="resetView">
@@ -252,10 +254,15 @@ onBeforeUnmount(() => observer?.disconnect())
   background: #ffffff;
 }
 .tool-group { display: flex; align-items: center; gap: 5px; }
+.view-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.grid-toggle { display: flex; align-items: center; gap: 5px; color: #60676f; font-size: 12px; white-space: nowrap; }
 .color-picker-label { display: flex; align-items: center; gap: 7px; color: #4f565e; font-size: 11px; }
 .color-picker { width: 30px; height: 26px; padding: 1px; border: 1px solid var(--border-strong); border-radius: 5px; background: #ffffff; }
 .color-picker-label code { color: #4b5158; font-size: 11px; }
 .pixel-viewport { min-height: 0; min-width: 0; overflow: auto; padding: 18px; background: #e9ebee; }
 .pixel-stage { min-width: 100%; min-height: 100%; display: grid; place-items: center; }
 .pixel-canvas { display: block; margin: auto; background: #ffffff; touch-action: none; image-rendering: pixelated; cursor: crosshair; }
+@media (max-width: 980px) {
+  .view-actions { width: 100%; justify-content: flex-end; }
+}
 </style>
