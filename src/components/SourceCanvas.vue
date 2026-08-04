@@ -149,12 +149,13 @@ function drawRect(context: CanvasRenderingContext2D, rect: Rect, active: boolean
   context.setLineDash([])
   context.fillStyle = color
   context.font = '12px sans-serif'
+  context.textAlign = 'left'
+  context.textBaseline = 'middle'
   const labelWidth = context.measureText(label).width + 12
   const labelHeight = 20
   const labelY = borderY >= labelHeight ? borderY - labelHeight : borderY
   context.fillRect(Math.floor(borderX), Math.floor(labelY), Math.ceil(labelWidth), labelHeight)
   context.fillStyle = '#FFFFFF'
-  context.textBaseline = 'middle'
   context.fillText(label, Math.floor(borderX + 6), Math.floor(labelY + labelHeight / 2))
 
   if (active) {
