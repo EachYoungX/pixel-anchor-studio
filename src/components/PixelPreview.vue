@@ -206,7 +206,7 @@ onMounted(draw)
         <button class="button button-small" type="button" @click="resetView">恢复视图</button>
       </div>
     </div>
-    <div ref="viewport" class="pixel-viewport" @wheel="handleWheel" @pointermove="handlePointerMove" @pointerup="handlePointerUp" @pointercancel="handlePointerUp">
+    <div ref="viewport" class="pixel-viewport" @wheel="handleWheel" @pointermove="handlePointerMove" @pointerup="handlePointerUp" @pointercancel="handlePointerUp" @dblclick="resetView">
       <canvas ref="canvas" class="pixel-canvas" @pointerdown="handlePointer" />
     </div>
   </div>
