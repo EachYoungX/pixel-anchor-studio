@@ -17,7 +17,7 @@ const workspaceMode = ref<'pixel' | 'bead'>('pixel')
     <TopBar />
     <nav class="workspace-tabs" aria-label="工作区">
       <button class="button button-small" :class="{ 'button-active': workspaceMode === 'pixel' }" type="button" @click="workspaceMode = 'pixel'">像素化与编辑</button>
-      <button class="button button-small" :class="{ 'button-active': workspaceMode === 'bead' }" type="button" @click="workspaceMode = 'bead'">拼豆图导出</button>
+      <button class="button button-small" :class="{ 'button-active': workspaceMode === 'bead' }" type="button" :disabled="!store.result" @click="workspaceMode = 'bead'">拼豆图导出</button>
     </nav>
     <div class="workspace">
       <SettingsPanel v-if="workspaceMode === 'pixel'" class="panel panel-left" />
