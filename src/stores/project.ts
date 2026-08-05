@@ -7,6 +7,7 @@ import { mergeSimilarColors } from '@/core/processing/palette-merge'
 import { base64ToBytes, bytesToBase64 } from '@/core/export/project'
 import { ProcessingService } from '@/domain/processing/processing-service'
 import { SourceSession } from '@/domain/source/source-session'
+import { imageToImageData } from '@/core/image/load'
 import type { DirtyBounds } from '@/domain/editor/pixel-operations'
 import { EditorSession } from '@/domain/editor/editor-session'
 import { defaultBead, defaultProcessing, defaultScale, defaultSnapSettings } from '@/domain/project/defaults'
@@ -249,7 +250,10 @@ export const useProjectStore = defineStore('project', () => {
         },
         scaleOffset: { x: scale.offsetX, y: scale.offsetY },
         processing: { ...toRaw(processing) },
-      }, sourceId.value)
+      }, sourceId.value, () => {
+        if (!sourceImage.value) throw new Error('原图兼容数据不可用，请重新导入图片')
+        return imageToImageData(sourceImage.value).data
+      })
       if (processId !== latestProcessId) return
       result.value = markRaw(response.result)
       lastDurationMs.value = response.durationMs

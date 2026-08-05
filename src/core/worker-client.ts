@@ -15,6 +15,13 @@ interface PendingRequest {
   timer: ReturnType<typeof setTimeout>
 }
 
+export class WorkerClientError extends Error {
+  constructor(public readonly code: string, message: string) {
+    super(message)
+    this.name = 'WorkerClientError'
+  }
+}
+
 let worker: Worker | null = null
 let sequence = 0
 const loadedSources = new Set<string>()
@@ -23,6 +30,9 @@ const sourceLoadCallbacks = new Map<string, { resolve: () => void; reject: (reas
 const pending = new Map<number, PendingRequest>()
 
 function rejectWorkerRequests(reason: Error): void {
+  const activeWorker = worker
+  worker = null
+  activeWorker?.terminate()
   for (const request of pending.values()) {
     clearTimeout(request.timer)
     request.reject(reason)
@@ -35,7 +45,6 @@ function rejectWorkerRequests(reason: Error): void {
   sourceLoads.clear()
   sourceLoadCallbacks.clear()
   loadedSources.clear()
-  worker = null
 }
 
 function post(message: unknown, transfer?: Transferable[]): void {
@@ -67,7 +76,7 @@ function getWorker(): Worker {
         const callback = sourceLoadCallbacks.get(message.sourceId)
         if (callback) {
           clearTimeout(callback.timer)
-          callback.reject(new Error(message.message))
+          callback.reject(new WorkerClientError(message.code, message.message))
         }
         sourceLoadCallbacks.delete(message.sourceId)
       }
@@ -76,7 +85,7 @@ function getWorker(): Worker {
       if (!request) return
       clearTimeout(request.timer)
       pending.delete(message.requestId)
-      request.reject(new Error(message.message))
+      request.reject(new WorkerClientError(message.code, message.message))
       return
     }
     const request = pending.get(message.requestId)

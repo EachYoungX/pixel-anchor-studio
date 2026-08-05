@@ -33,11 +33,18 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
           await bitmapBackend.load(message.sourceId, message.source)
           sourceBackends.set(message.sourceId, 'bitmap')
         } catch {
-          if (!message.source.data) throw new Error('无法解码原图')
+          if (!message.source.data) {
+            self.postMessage({ type: 'error', protocol: 1, sourceId: message.sourceId, code: 'SOURCE_RGBA_FALLBACK_REQUIRED', message: '当前环境需要使用RGBA兼容后端' })
+            return
+          }
           await rgbaBackend.load(message.sourceId, message.source)
           sourceBackends.set(message.sourceId, 'rgba')
         }
       } else {
+        if (!message.source.data) {
+          self.postMessage({ type: 'error', protocol: 1, sourceId: message.sourceId, code: 'SOURCE_RGBA_FALLBACK_REQUIRED', message: '当前环境需要使用RGBA兼容后端' })
+          return
+        }
         await rgbaBackend.load(message.sourceId, message.source)
         sourceBackends.set(message.sourceId, 'rgba')
       }

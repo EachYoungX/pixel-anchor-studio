@@ -16,6 +16,7 @@ class FakeWorker {
   onerror: (() => void) | null = null
   onmessageerror: (() => void) | null = null
   readonly messages: FakeMessage[] = []
+  terminated = false
 
   constructor(private readonly processMessage: (worker: FakeWorker, message: FakeMessage) => void) {}
 
@@ -23,6 +24,8 @@ class FakeWorker {
     this.messages.push(message)
     this.processMessage(this, message)
   }
+
+  terminate(): void { this.terminated = true }
 }
 
 const originalWorker = globalThis.Worker
@@ -74,11 +77,13 @@ describe('worker client defensive handling', () => {
   it('rejects all pending work when the Worker crashes', async () => {
     installFakeWorker((worker) => queueMicrotask(() => worker.onerror?.()))
     await expect(runProcessing(request())).rejects.toThrow('图像处理Worker已崩溃')
+    expect(lastWorker?.terminated).toBe(true)
   })
 
   it('rejects all pending work when a Worker message cannot be decoded', async () => {
     installFakeWorker((worker) => queueMicrotask(() => worker.onmessageerror?.()))
     await expect(runProcessing(request())).rejects.toThrow('图像处理Worker消息无效')
+    expect(lastWorker?.terminated).toBe(true)
   })
 
   it('loads a source once and reloads it after release', async () => {
