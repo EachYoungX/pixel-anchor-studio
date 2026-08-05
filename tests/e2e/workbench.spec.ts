@@ -452,8 +452,9 @@ test('shows repository-backed release notes and the complete project license', a
   await expect(dialog).toBeVisible()
 
   await dialog.getByRole('button', { name: '更新日志' }).click()
-  await expect(dialog.getByText('v0.4.2')).toBeVisible()
-  await expect(dialog.getByRole('heading', { name: '操作' })).toBeVisible()
+  await expect(dialog.getByText('v0.4.3')).toBeVisible()
+  await expect(dialog.getByRole('heading', { name: '修复' })).toBeVisible()
+  await expect(dialog.getByRole('heading', { name: '稳定性' })).toBeVisible()
 
   await dialog.getByRole('button', { name: '项目与许可' }).click()
   await expect(dialog.getByRole('heading', { name: '项目声明' })).toBeVisible()
