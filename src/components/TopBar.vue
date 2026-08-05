@@ -12,11 +12,21 @@ const projectInput = ref<HTMLInputElement | null>(null)
 const brandButton = ref<HTMLButtonElement | null>(null)
 const projectMenu = ref<HTMLElement | null>(null)
 const projectMenuButton = ref<HTMLButtonElement | null>(null)
+const firstProjectMenuItem = ref<HTMLButtonElement | null>(null)
 const projectMenuOpen = ref(false)
 const aboutOpen = ref(false)
 
 function closeProjectMenu(): void {
   projectMenuOpen.value = false
+}
+
+function toggleProjectMenu(): void {
+  if (projectMenuOpen.value) {
+    closeProjectMenu()
+    return
+  }
+  projectMenuOpen.value = true
+  nextTick(() => firstProjectMenuItem.value?.focus())
 }
 
 function handleDocumentPointerDown(event: PointerEvent): void {
@@ -98,9 +108,9 @@ function openProjectPicker(): void {
     <nav class="top-actions" aria-label="文件和历史操作">
       <button class="button" type="button" @click="imageInput?.click()">导入图片</button>
       <div ref="projectMenu" class="project-menu">
-        <button ref="projectMenuButton" class="button" type="button" aria-haspopup="menu" :aria-expanded="projectMenuOpen" @click="projectMenuOpen = !projectMenuOpen">项目</button>
+        <button ref="projectMenuButton" class="button" type="button" aria-haspopup="menu" :aria-expanded="projectMenuOpen" @click="toggleProjectMenu">项目</button>
         <div v-if="projectMenuOpen" class="project-menu__panel" role="menu">
-          <button class="project-menu__item" role="menuitem" type="button" @click="openProjectPicker">打开项目</button>
+          <button ref="firstProjectMenuItem" class="project-menu__item" role="menuitem" type="button" @click="openProjectPicker">打开项目</button>
           <button class="project-menu__item" role="menuitem" type="button" :disabled="!store.source" @click="saveProject">保存项目</button>
         </div>
       </div>

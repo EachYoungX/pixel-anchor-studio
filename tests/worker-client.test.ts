@@ -5,6 +5,7 @@ import type { ProcessRequest } from '@/types/project'
 type FakeMessage = {
   type: string
   sourceId?: string
+  generation?: number
   requestId?: number
   protocol?: number
   result?: { width: number; height: number; data: Uint8ClampedArray }
@@ -48,7 +49,7 @@ function installFakeWorker(onProcess: (worker: FakeWorker, message: FakeMessage)
     constructor() {
       super((worker, message) => {
         if (message.type === 'load-source' && respondToLoad) {
-          queueMicrotask(() => worker.onmessage?.({ data: { type: 'source-loaded', protocol: 1, sourceId: message.sourceId } } as MessageEvent<FakeMessage>))
+          queueMicrotask(() => worker.onmessage?.({ data: { type: 'source-loaded', protocol: 1, sourceId: message.sourceId, generation: message.generation } } as MessageEvent<FakeMessage>))
           return
         }
         if (message.type === 'process') onProcess(worker, message)
@@ -122,5 +123,36 @@ describe('worker client defensive handling', () => {
     await runProcessing(request(), 'source-reuse')
     expect(lastWorker?.messages.filter((message) => message.type === 'load-source')).toHaveLength(2)
     expect(lastWorker?.messages.some((message) => message.type === 'release-source')).toBe(true)
+  })
+
+  it('rejects a released load and ignores its late completion', async () => {
+    installFakeWorker((worker, message) => queueMicrotask(() => worker.onmessage?.({
+      data: { type: 'process-result', protocol: 1, requestId: message.requestId, result: { width: 1, height: 1, data: new Uint8ClampedArray([1, 2, 3, 255]) }, durationMs: 0 },
+    } as MessageEvent<FakeMessage>)), false)
+
+    const sourceAPromise = runProcessing(request(), 'source-a', 1_000)
+    const sourceARejection = expect(sourceAPromise).rejects.toMatchObject({ code: 'SOURCE_RELEASED' })
+    const sourceALoad = lastWorker!.messages.find((message) => message.type === 'load-source')!
+    releaseProcessingSource('source-a')
+    await sourceARejection
+
+    lastWorker!.onmessage?.({ data: {
+      type: 'source-loaded',
+      protocol: 1,
+      sourceId: 'source-a',
+      generation: sourceALoad.generation,
+    } } as MessageEvent<FakeMessage>)
+    expect(lastWorker!.messages.filter((message) => message.type === 'process')).toHaveLength(0)
+
+    const sourceBPromise = runProcessing(request(), 'source-b', 1_000)
+    const sourceBLoad = lastWorker!.messages.find((message) => message.type === 'load-source' && message.sourceId === 'source-b')!
+    lastWorker!.onmessage?.({ data: {
+      type: 'source-loaded',
+      protocol: 1,
+      sourceId: 'source-b',
+      generation: sourceBLoad.generation,
+    } } as MessageEvent<FakeMessage>)
+
+    await expect(sourceBPromise).resolves.toMatchObject({ result: { width: 1, height: 1 } })
   })
 })

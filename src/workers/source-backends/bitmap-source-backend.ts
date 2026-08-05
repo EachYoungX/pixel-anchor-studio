@@ -7,11 +7,16 @@ export class BitmapSourceBackend implements WorkerSourceBackend {
     return typeof createImageBitmap === 'function' && typeof OffscreenCanvas !== 'undefined'
   }
 
-  async load(sourceId: string, input: WorkerSourceInput): Promise<void> {
+  async load(sourceId: string, input: WorkerSourceInput, isCurrent: () => boolean = () => true): Promise<boolean> {
     if (!this.supported || !input.blob) throw new Error('ImageBitmap后端不可用')
     const bitmap = await createImageBitmap(input.blob)
+    if (!isCurrent()) {
+      bitmap.close()
+      return false
+    }
     this.sources.get(sourceId)?.close()
     this.sources.set(sourceId, bitmap)
+    return true
   }
 
   getDimensions(sourceId: string): SourceDimensions {

@@ -3,9 +3,11 @@ import { cropEnvelope, type CropRect, type SourceCrop, type SourceDimensions, ty
 export class RgbaSourceBackend implements WorkerSourceBackend {
   private readonly sources = new Map<string, { width: number; height: number; data: Uint8ClampedArray }>()
 
-  async load(sourceId: string, input: WorkerSourceInput): Promise<void> {
+  async load(sourceId: string, input: WorkerSourceInput, isCurrent: () => boolean = () => true): Promise<boolean> {
     if (!input.data) throw new Error('Worker缺少RGBA回退数据')
+    if (!isCurrent()) return false
     this.sources.set(sourceId, { width: input.width, height: input.height, data: input.data })
+    return true
   }
 
   getDimensions(sourceId: string): SourceDimensions {

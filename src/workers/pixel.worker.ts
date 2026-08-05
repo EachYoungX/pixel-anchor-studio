@@ -10,14 +10,15 @@ import type { WorkerSourceInput } from '@/workers/source-backends/source-backend
 declare const self: DedicatedWorkerGlobalScope
 
 type WorkerRequest =
-  | { type: 'load-source'; protocol: 1; sourceId: string; source: WorkerSourceInput }
-  | { type: 'release-source'; protocol: 1; sourceId: string }
+  | { type: 'load-source'; protocol: 1; sourceId: string; generation: number; source: WorkerSourceInput }
+  | { type: 'release-source'; protocol: 1; sourceId: string; generation: number }
   | { type: 'clear'; protocol: 1 }
   | ({ type: 'process'; protocol: 1; sourceId: string; requestId: number } & Omit<ProcessRequest, 'source' | 'sourceFile'>)
 
 const bitmapBackend = new BitmapSourceBackend()
 const rgbaBackend = new RgbaSourceBackend()
 const sourceBackends = new Map<string, 'bitmap' | 'rgba'>()
+const sourceGenerations = new Map<string, number>()
 const processingCaches = createProcessingCaches()
 
 self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
@@ -27,34 +28,46 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
     return
   }
   if (message.type === 'load-source') {
+    if ((sourceGenerations.get(message.sourceId) ?? 0) > message.generation) return
+    sourceGenerations.set(message.sourceId, message.generation)
+    const isCurrent = () => sourceGenerations.get(message.sourceId) === message.generation
     try {
       if (message.source.blob && bitmapBackend.supported) {
         try {
-          await bitmapBackend.load(message.sourceId, message.source)
+          if (!await bitmapBackend.load(message.sourceId, message.source, isCurrent)) return
           sourceBackends.set(message.sourceId, 'bitmap')
         } catch {
+          if (!isCurrent()) return
           if (!message.source.data) {
-            self.postMessage({ type: 'error', protocol: 1, sourceId: message.sourceId, code: 'SOURCE_RGBA_FALLBACK_REQUIRED', message: '当前环境需要使用RGBA兼容后端' })
+            self.postMessage({ type: 'error', protocol: 1, sourceId: message.sourceId, generation: message.generation, code: 'SOURCE_RGBA_FALLBACK_REQUIRED', message: '当前环境需要使用RGBA兼容后端' })
             return
           }
-          await rgbaBackend.load(message.sourceId, message.source)
+          if (!await rgbaBackend.load(message.sourceId, message.source, isCurrent)) return
           sourceBackends.set(message.sourceId, 'rgba')
         }
       } else {
         if (!message.source.data) {
-          self.postMessage({ type: 'error', protocol: 1, sourceId: message.sourceId, code: 'SOURCE_RGBA_FALLBACK_REQUIRED', message: '当前环境需要使用RGBA兼容后端' })
+          self.postMessage({ type: 'error', protocol: 1, sourceId: message.sourceId, generation: message.generation, code: 'SOURCE_RGBA_FALLBACK_REQUIRED', message: '当前环境需要使用RGBA兼容后端' })
           return
         }
-        await rgbaBackend.load(message.sourceId, message.source)
+        if (!await rgbaBackend.load(message.sourceId, message.source, isCurrent)) return
         sourceBackends.set(message.sourceId, 'rgba')
       }
-      self.postMessage({ type: 'source-loaded', protocol: 1, sourceId: message.sourceId, backend: sourceBackends.get(message.sourceId) })
+      if (!isCurrent()) {
+        bitmapBackend.release(message.sourceId)
+        rgbaBackend.release(message.sourceId)
+        sourceBackends.delete(message.sourceId)
+        return
+      }
+      self.postMessage({ type: 'source-loaded', protocol: 1, sourceId: message.sourceId, generation: message.generation, backend: sourceBackends.get(message.sourceId) })
     } catch (error) {
-      self.postMessage({ type: 'error', protocol: 1, sourceId: message.sourceId, code: 'SOURCE_DECODE_FAILED', message: error instanceof Error ? error.message : '无法解码原图' })
+      if (isCurrent()) self.postMessage({ type: 'error', protocol: 1, sourceId: message.sourceId, generation: message.generation, code: 'SOURCE_DECODE_FAILED', message: error instanceof Error ? error.message : '无法解码原图' })
     }
     return
   }
   if (message.type === 'release-source') {
+    if ((sourceGenerations.get(message.sourceId) ?? 0) > message.generation) return
+    sourceGenerations.set(message.sourceId, message.generation)
     bitmapBackend.release(message.sourceId)
     rgbaBackend.release(message.sourceId)
     sourceBackends.delete(message.sourceId)
@@ -68,6 +81,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
     bitmapBackend.clear()
     rgbaBackend.clear()
     sourceBackends.clear()
+    sourceGenerations.clear()
     processingCaches.crop.clear()
     processingCaches.sampling.clear()
     processingCaches.quantized.clear()

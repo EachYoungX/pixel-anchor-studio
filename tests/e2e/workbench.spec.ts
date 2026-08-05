@@ -330,9 +330,26 @@ test('keeps document scrolling and completes crop, project, and bead export flow
   await page.getByRole('button', { name: '居中正方形' }).click()
   await page.getByRole('button', { name: '生成预览' }).click()
   await expect(page.getByText(/已生成 32 × 32/)).toBeVisible()
+  await page.locator('.merge-button:not(:disabled)').first().click()
+  await expect(page.getByRole('button', { name: '撤销' })).toBeEnabled()
+
+  const brokenImageDialog = page.waitForEvent('dialog')
+  await page.locator('input[type="file"]').nth(0).setInputFiles({
+    name: 'broken.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('not-an-image'),
+  })
+  const imageDialog = await brokenImageDialog
+  expect(imageDialog.message()).toContain('无法解码图片')
+  await imageDialog.accept()
+  await expect(page.getByText('v040-roundtrip.png · 48 × 32', { exact: true })).toBeVisible()
+  await expect(page.getByText(/输出 32 × 32/)).toBeVisible()
+  await expect(page.getByRole('button', { name: '撤销' })).toBeEnabled()
+  await page.getByRole('button', { name: '撤销' }).click()
 
   await page.getByRole('button', { name: '项目' }).click()
   await expect(page.getByRole('menuitem', { name: '打开项目' })).toBeVisible()
+  await expect(page.getByRole('menuitem', { name: '打开项目' })).toBeFocused()
   await page.getByRole('heading', { name: '原图与网格' }).click()
   await expect(page.getByRole('menuitem', { name: '打开项目' })).toBeHidden()
 
@@ -343,6 +360,24 @@ test('keeps document scrolling and completes crop, project, and bead export flow
   const savedDownload = await savedDownloadPromise
   expect(savedDownload.suggestedFilename()).toContain('.pixel-anchor.json')
   const savedProject = await readDownload(savedDownload)
+
+  await page.locator('.merge-button:not(:disabled)').first().click()
+  await expect(page.getByRole('button', { name: '撤销' })).toBeEnabled()
+  const corruptedProject = JSON.parse(savedProject.toString('utf8'))
+  corruptedProject.source.dataBase64 = Buffer.from('not-an-image').toString('base64')
+  const brokenProjectDialog = page.waitForEvent('dialog')
+  await page.locator('input[type="file"]').nth(1).setInputFiles({
+    name: 'broken.pixel-anchor.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(corruptedProject)),
+  })
+  const projectDialog = await brokenProjectDialog
+  expect(projectDialog.message()).toContain('无法解码图片')
+  await projectDialog.accept()
+  await expect(page.getByText('v040-roundtrip.png · 48 × 32', { exact: true })).toBeVisible()
+  await expect(page.getByText(/输出 32 × 32/)).toBeVisible()
+  await expect(page.getByRole('button', { name: '撤销' })).toBeEnabled()
+  await page.getByRole('button', { name: '撤销' }).click()
 
   await page.locator('input[type="file"]').nth(1).setInputFiles({
     name: 'v040-roundtrip.pixel-anchor.json',

@@ -5,9 +5,9 @@ const PROTOCOL_VERSION = 1
 const PROCESS_TIMEOUT_MS = 30_000
 
 type WorkerMessage =
-  | { type: 'source-loaded'; protocol: 1; sourceId: string; backend: 'bitmap' | 'rgba' }
+  | { type: 'source-loaded'; protocol: 1; sourceId: string; generation: number; backend: 'bitmap' | 'rgba' }
   | { type: 'process-result'; protocol: 1; requestId: number; result: ProcessResponse['result']; durationMs: number }
-  | { type: 'error'; protocol: 1; requestId?: number; sourceId?: string; code: string; message: string }
+  | { type: 'error'; protocol: 1; requestId?: number; sourceId?: string; generation?: number; code: string; message: string }
 
 interface PendingRequest {
   resolve: (value: ProcessResponse) => void
@@ -25,8 +25,10 @@ export class WorkerClientError extends Error {
 let worker: Worker | null = null
 let sequence = 0
 const loadedSources = new Set<string>()
+const releasedSources = new Set<string>()
+const sourceGenerations = new Map<string, number>()
 const sourceLoads = new Map<string, Promise<void>>()
-const sourceLoadCallbacks = new Map<string, { resolve: () => void; reject: (reason?: unknown) => void; timer: ReturnType<typeof setTimeout> }>()
+const sourceLoadCallbacks = new Map<string, { generation: number; resolve: () => void; reject: (reason?: unknown) => void; timer: ReturnType<typeof setTimeout> }>()
 const pending = new Map<number, PendingRequest>()
 
 function rejectWorkerRequests(reason: Error): void {
@@ -45,6 +47,8 @@ function rejectWorkerRequests(reason: Error): void {
   sourceLoads.clear()
   sourceLoadCallbacks.clear()
   loadedSources.clear()
+  releasedSources.clear()
+  sourceGenerations.clear()
 }
 
 function post(message: unknown, transfer?: Transferable[]): void {
@@ -62,23 +66,27 @@ function getWorker(): Worker {
   worker.onmessage = (event: MessageEvent<WorkerMessage>) => {
     const message = event.data
     if (message.type === 'source-loaded') {
+      if (releasedSources.has(message.sourceId) || sourceGenerations.get(message.sourceId) !== message.generation) {
+        try { post({ type: 'release-source', protocol: PROTOCOL_VERSION, sourceId: message.sourceId, generation: message.generation }) } catch { /* handled by worker lifecycle */ }
+        return
+      }
       loadedSources.add(message.sourceId)
       const callback = sourceLoadCallbacks.get(message.sourceId)
-      if (callback) {
+      if (callback?.generation === message.generation) {
         clearTimeout(callback.timer)
         callback.resolve()
+        sourceLoadCallbacks.delete(message.sourceId)
       }
-      sourceLoadCallbacks.delete(message.sourceId)
       return
     }
     if (message.type === 'error') {
       if (message.sourceId) {
         const callback = sourceLoadCallbacks.get(message.sourceId)
-        if (callback) {
+        if (callback && (message.generation === undefined || callback.generation === message.generation)) {
           clearTimeout(callback.timer)
           callback.reject(new WorkerClientError(message.code, message.message))
+          sourceLoadCallbacks.delete(message.sourceId)
         }
-        sourceLoadCallbacks.delete(message.sourceId)
       }
       if (message.requestId === undefined) return
       const request = pending.get(message.requestId)
@@ -104,19 +112,25 @@ function loadSource(sourceId: string, input: WorkerSourceInput, timeoutMs: numbe
   const existing = sourceLoads.get(sourceId)
   if (existing) return existing
   getWorker()
-  const promise = new Promise<void>((resolve, reject) => {
+  releasedSources.delete(sourceId)
+  const generation = (sourceGenerations.get(sourceId) ?? 0) + 1
+  sourceGenerations.set(sourceId, generation)
+  let promise: Promise<void>
+  promise = new Promise<void>((resolve, reject) => {
     const timer = setTimeout(() => {
       rejectWorkerRequests(new Error('加载原图超时，请重新导入图片'))
     }, timeoutMs)
-    sourceLoadCallbacks.set(sourceId, { resolve, reject, timer })
+    sourceLoadCallbacks.set(sourceId, { generation, resolve, reject, timer })
     try {
-      post({ type: 'load-source', protocol: PROTOCOL_VERSION, sourceId, source: input }, input.data ? [input.data.buffer as ArrayBuffer] : undefined)
+      post({ type: 'load-source', protocol: PROTOCOL_VERSION, sourceId, generation, source: input }, input.data ? [input.data.buffer as ArrayBuffer] : undefined)
     } catch (error) {
       clearTimeout(timer)
       sourceLoadCallbacks.delete(sourceId)
       reject(error)
     }
-  }).finally(() => sourceLoads.delete(sourceId))
+  }).finally(() => {
+    if (sourceLoads.get(sourceId) === promise) sourceLoads.delete(sourceId)
+  })
   sourceLoads.set(sourceId, promise)
   return promise
 }
@@ -148,11 +162,20 @@ export async function runProcessing(request: ProcessRequest, sourceId = request.
 }
 
 export function releaseProcessingSource(sourceId: string): void {
+  const generation = (sourceGenerations.get(sourceId) ?? 0) + 1
+  sourceGenerations.set(sourceId, generation)
+  releasedSources.add(sourceId)
+  const callback = sourceLoadCallbacks.get(sourceId)
+  if (callback) {
+    clearTimeout(callback.timer)
+    callback.reject(new WorkerClientError('SOURCE_RELEASED', '原图加载已取消'))
+    sourceLoadCallbacks.delete(sourceId)
+  }
   loadedSources.delete(sourceId)
   sourceLoads.delete(sourceId)
   if (!worker) return
   try {
-    worker.postMessage({ type: 'release-source', protocol: PROTOCOL_VERSION, sourceId })
+    worker.postMessage({ type: 'release-source', protocol: PROTOCOL_VERSION, sourceId, generation })
   } catch {
     // Worker错误会由onerror统一清理。
   }

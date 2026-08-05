@@ -37,7 +37,7 @@ export function cropEnvelope(crop: CropRect, source: SourceDimensions): CropEnve
 }
 
 export interface WorkerSourceBackend {
-  load(sourceId: string, input: WorkerSourceInput): Promise<void>
+  load(sourceId: string, input: WorkerSourceInput, isCurrent?: () => boolean): Promise<boolean>
   getDimensions(sourceId: string): SourceDimensions
   readCrop(sourceId: string, crop: CropRect): SourceCrop
   release(sourceId: string): void

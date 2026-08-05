@@ -3,6 +3,13 @@ import type { SourceRuntime } from '@/domain/source/source-types'
 
 const MAX_SOURCE_PIXELS = 40_000_000
 
+export function validateSourceDimensions(width: number, height: number): number {
+  const pixels = width * height
+  if (width < 1 || height < 1 || !Number.isFinite(pixels)) throw new Error('原图尺寸无效，请重新选择图片')
+  if (pixels > MAX_SOURCE_PIXELS) throw new Error('原图超过4000万像素，请先适当缩小后再导入')
+  return pixels
+}
+
 export function loadHtmlImage(dataUrl: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image()
@@ -22,10 +29,12 @@ export async function loadSourceFile(file: File): Promise<{ source: SourceRuntim
     URL.revokeObjectURL(previewUrl)
     throw error
   }
-  const pixels = image.naturalWidth * image.naturalHeight
-  if (pixels > MAX_SOURCE_PIXELS) {
+  let pixels: number
+  try {
+    pixels = validateSourceDimensions(image.naturalWidth, image.naturalHeight)
+  } catch (error) {
     URL.revokeObjectURL(previewUrl)
-    throw new Error('原图超过4000万像素，请先适当缩小后再导入')
+    throw error
   }
   return {
     source: {

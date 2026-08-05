@@ -8,6 +8,7 @@ import { ProcessingService } from '@/domain/processing/processing-service'
 import { SourceSession } from '@/domain/source/source-session'
 import { imageToImageData } from '@/core/image/load'
 import type { SourceRuntime } from '@/domain/source/source-types'
+import type { SourceSessionValue } from '@/domain/source/source-session'
 import type { SourcePreview } from '@/runtime/source-preview'
 import { createPaletteSnapshot, replacePaletteColor } from '@/domain/palette/palette-service'
 import { serializeProject } from '@/domain/project/serialization'
@@ -65,22 +66,30 @@ export const useProjectStore = defineStore('project', () => {
   const undoLabel = computed(() => history.value[history.value.length - 1]?.label ?? '撤销')
   const redoLabel = computed(() => future.value[future.value.length - 1]?.label ?? '重做')
   let latestProcessId = 0
+  let latestSourceLoadId = 0
   let sourceRevision = 0
   const sourceId = ref('source-0')
   const processingService = new ProcessingService()
   const sourceSession = new SourceSession()
   const editorSession = new EditorSession()
 
-  function releaseCurrentSource(): void {
+  function adoptSource(next: SourceSessionValue | null): void {
     latestProcessId += 1
-    sourceRevision += 1
     processingService.releaseSource(sourceId.value)
-    sourceSession.release()
+    sourceRevision += 1
     sourceId.value = `source-${sourceRevision}`
-    source.value = null
-    sourceImage.value = null
-    sourcePreview.value = null
+    if (next) sourceSession.adopt(next)
+    else sourceSession.release()
+    source.value = next?.source ?? null
+    sourceImage.value = next ? markRaw(next.image) : null
+    sourcePreview.value = next ? markRaw(next.preview) : null
+  }
+
+  function releaseCurrentSource(): void {
+    latestSourceLoadId += 1
+    adoptSource(null)
     result.value = null
+    notifyResultChanged()
     palette.value = []
     colorCodes.value = {}
     history.value = []
@@ -118,11 +127,19 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   async function importImage(file: File): Promise<void> {
-    releaseCurrentSource()
-    const loaded = await sourceSession.openFile(file)
-    source.value = loaded.source
-    sourceImage.value = markRaw(loaded.image)
-    sourcePreview.value = markRaw(loaded.preview)
+    const loadId = ++latestSourceLoadId
+    let loaded: SourceSessionValue
+    try {
+      loaded = await sourceSession.prepareFile(file)
+    } catch (error) {
+      if (loadId === latestSourceLoadId) status.value = '图片导入失败，当前项目未受影响'
+      throw error
+    }
+    if (loadId !== latestSourceLoadId) {
+      sourceSession.discard(loaded)
+      return
+    }
+    adoptSource(loaded)
     Object.assign(crop, { x: 0, y: 0, width: loaded.source.width, height: loaded.source.height })
     cropSettings.mode = 'custom'
     const anchorSide = Math.max(8, Math.min(loaded.source.width, loaded.source.height) * 0.12)
@@ -393,41 +410,48 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   async function loadSerialized(project: SerializedProject): Promise<void> {
-    releaseCurrentSource()
-    if (project.source) {
-      const bytes = base64ToBytes(project.source.dataBase64)
-      const rawBytes = new ArrayBuffer(bytes.byteLength)
-      new Uint8Array(rawBytes).set(bytes)
-      const blob = new Blob([rawBytes], { type: project.source.mime || 'image/png' })
-      const loaded = await sourceSession.openBlob({ name: project.source.name, mime: project.source.mime, width: project.source.width, height: project.source.height, blob })
-      source.value = loaded.source
-      sourceImage.value = markRaw(loaded.image)
-      sourcePreview.value = markRaw(loaded.preview)
-    } else {
-      source.value = null
-      sourceImage.value = null
-      sourcePreview.value = null
+    const loadId = ++latestSourceLoadId
+    let loaded: SourceSessionValue | null = null
+    try {
+      if (project.source) {
+        const bytes = base64ToBytes(project.source.dataBase64)
+        const rawBytes = new ArrayBuffer(bytes.byteLength)
+        new Uint8Array(rawBytes).set(bytes)
+        const blob = new Blob([rawBytes], { type: project.source.mime || 'image/png' })
+        loaded = await sourceSession.prepareBlob({ name: project.source.name, mime: project.source.mime, width: project.source.width, height: project.source.height, blob })
+      }
+      const nextResult = project.result
+        ? markRaw({
+            width: project.result.width,
+            height: project.result.height,
+            data: base64ToBytes(project.result.dataBase64),
+          })
+        : null
+      if (loadId !== latestSourceLoadId) {
+        if (loaded) sourceSession.discard(loaded)
+        return
+      }
+      adoptSource(loaded)
+      Object.assign(crop, project.cropSettings.customRect)
+      cropSettings.mode = project.cropSettings.mode
+      const sourceWidth = source.value?.width ?? Math.max(4, project.crop.x + project.crop.width)
+      const sourceHeight = source.value?.height ?? Math.max(4, project.crop.y + project.crop.height)
+      Object.assign(anchor, normalizeSourceAnchor(project.anchor, sourceWidth, sourceHeight))
+      Object.assign(scale, project.scale)
+      Object.assign(processing, project.processing)
+      Object.assign(bead, project.bead)
+      result.value = nextResult
+      notifyResultChanged()
+      colorCodes.value = { ...project.colorCodes }
+      history.value = []
+      future.value = []
+      refreshPalette()
+      status.value = '项目已打开'
+    } catch (error) {
+      if (loaded) sourceSession.discard(loaded)
+      if (loadId === latestSourceLoadId) status.value = '项目打开失败，当前项目未受影响'
+      throw error
     }
-    Object.assign(crop, project.cropSettings.customRect)
-    cropSettings.mode = project.cropSettings.mode
-    const sourceWidth = source.value?.width ?? Math.max(4, project.crop.x + project.crop.width)
-    const sourceHeight = source.value?.height ?? Math.max(4, project.crop.y + project.crop.height)
-    Object.assign(anchor, normalizeSourceAnchor(project.anchor, sourceWidth, sourceHeight))
-    Object.assign(scale, project.scale)
-    Object.assign(processing, project.processing)
-    Object.assign(bead, project.bead)
-    result.value = project.result
-      ? markRaw({
-          width: project.result.width,
-          height: project.result.height,
-          data: base64ToBytes(project.result.dataBase64),
-        })
-      : null
-    colorCodes.value = { ...project.colorCodes }
-    history.value = []
-    future.value = []
-    refreshPalette()
-    status.value = '项目已打开'
   }
 
   return {
