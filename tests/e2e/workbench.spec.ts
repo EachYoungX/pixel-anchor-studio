@@ -128,7 +128,12 @@ test('imports, processes, edits, and keeps both canvas viewports aligned', async
   await pngDialog.getByLabel('PNG放大倍数').selectOption('custom')
   await pngDialog.getByLabel('自定义PNG倍数').fill('16')
   await expect(pngDialog.getByText('512 × 336')).toBeVisible()
-  await pngDialog.getByRole('button', { name: '取消' }).click()
+  await pngDialog.getByLabel('PNG放大倍数').selectOption('2')
+  await expect(pngDialog.getByText('64 × 42')).toBeVisible()
+  const pngDownloadPromise = page.waitForEvent('download')
+  await pngDialog.getByRole('button', { name: '导出PNG' }).click()
+  const pngDownload = await pngDownloadPromise
+  expect(pngDownload.suggestedFilename()).toMatch(/-32x21-2x\.png$/)
 
   const pixelSurface = page.locator('.pixel-surface')
   await expect(pixelSurface).toHaveCount(1)
@@ -365,7 +370,7 @@ test('shows repository-backed release notes and the complete project license', a
   await expect(dialog).toBeVisible()
 
   await dialog.getByRole('button', { name: '更新日志' }).click()
-  await expect(dialog.getByText('v0.4.1')).toBeVisible()
+  await expect(dialog.getByText('v0.4.2')).toBeVisible()
   await expect(dialog.getByRole('heading', { name: '操作' })).toBeVisible()
 
   await dialog.getByRole('button', { name: '项目与许可' }).click()
