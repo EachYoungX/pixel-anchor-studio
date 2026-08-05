@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, ref } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { sanitizeFilename } from '@/core/export/download'
 import { exportProjectFile, parseProjectFile } from '@/core/export/project'
 import { useProjectStore } from '@/stores/project'
@@ -10,8 +10,36 @@ const store = useProjectStore()
 const imageInput = ref<HTMLInputElement | null>(null)
 const projectInput = ref<HTMLInputElement | null>(null)
 const brandButton = ref<HTMLButtonElement | null>(null)
+const projectMenu = ref<HTMLElement | null>(null)
+const projectMenuButton = ref<HTMLButtonElement | null>(null)
 const projectMenuOpen = ref(false)
 const aboutOpen = ref(false)
+
+function closeProjectMenu(): void {
+  projectMenuOpen.value = false
+}
+
+function handleDocumentPointerDown(event: PointerEvent): void {
+  if (!projectMenuOpen.value) return
+  const target = event.target
+  if (target instanceof Node && !projectMenu.value?.contains(target)) closeProjectMenu()
+}
+
+function handleDocumentKeydown(event: KeyboardEvent): void {
+  if (!projectMenuOpen.value || event.key !== 'Escape') return
+  closeProjectMenu()
+  projectMenuButton.value?.focus()
+}
+
+onMounted(() => {
+  document.addEventListener('pointerdown', handleDocumentPointerDown)
+  document.addEventListener('keydown', handleDocumentKeydown)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', handleDocumentPointerDown)
+  document.removeEventListener('keydown', handleDocumentKeydown)
+})
 
 function closeAbout(): void {
   aboutOpen.value = false
@@ -69,8 +97,8 @@ function openProjectPicker(): void {
     </div>
     <nav class="top-actions" aria-label="文件和历史操作">
       <button class="button" type="button" @click="imageInput?.click()">导入图片</button>
-      <div class="project-menu">
-        <button class="button" type="button" aria-haspopup="menu" :aria-expanded="projectMenuOpen" @click="projectMenuOpen = !projectMenuOpen">项目</button>
+      <div ref="projectMenu" class="project-menu">
+        <button ref="projectMenuButton" class="button" type="button" aria-haspopup="menu" :aria-expanded="projectMenuOpen" @click="projectMenuOpen = !projectMenuOpen">项目</button>
         <div v-if="projectMenuOpen" class="project-menu__panel" role="menu">
           <button class="project-menu__item" role="menuitem" type="button" @click="openProjectPicker">打开项目</button>
           <button class="project-menu__item" role="menuitem" type="button" :disabled="!store.source" @click="saveProject">保存项目</button>

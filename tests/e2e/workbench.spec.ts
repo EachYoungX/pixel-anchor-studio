@@ -321,9 +321,14 @@ test('keeps document scrolling and completes crop, project, and bead export flow
   await page.getByRole('button', { name: '生成预览' }).click()
   await expect(page.getByText(/已生成 32 × 32/)).toBeVisible()
 
-  const savedDownloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: '项目' }).click()
   await expect(page.getByRole('menuitem', { name: '打开项目' })).toBeVisible()
+  await page.getByRole('heading', { name: '原图与网格' }).click()
+  await expect(page.getByRole('menuitem', { name: '打开项目' })).toBeHidden()
+
+  await page.getByRole('button', { name: '项目' }).click()
+  await expect(page.getByRole('menuitem', { name: '保存项目' })).toBeVisible()
+  const savedDownloadPromise = page.waitForEvent('download')
   await page.getByRole('menuitem', { name: '保存项目' }).click()
   const savedDownload = await savedDownloadPromise
   expect(savedDownload.suggestedFilename()).toContain('.pixel-anchor.json')
