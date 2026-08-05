@@ -65,4 +65,15 @@ describe('migrateProject', () => {
 
     expect(project.source).toEqual({ name: 'sample.jpg', mime: 'image/jpeg', width: 3, height: 2, dataBase64: 'QUJD' })
   })
+
+  it('normalizes a legacy rectangular anchor into a bounded square', () => {
+    const project = migrateProject({
+      ...baseProject,
+      version: 3,
+      source: { name: 'sample.png', dataUrl: 'data:image/png;base64,QUJD', width: 100, height: 80 },
+      anchor: { x: 90, y: 70, width: 30, height: 12 },
+    })
+
+    expect(project.anchor).toEqual({ x: 88, y: 68, width: 12, height: 12 })
+  })
 })

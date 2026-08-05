@@ -90,9 +90,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       x: message.crop.x - envelope.originX,
       y: message.crop.y - envelope.originY,
     }
-    const localGrid = message.grid
-      ? { ...message.grid, originX: message.grid.originX - envelope.originX, originY: message.grid.originY - envelope.originY }
-      : undefined
+    const localGrid = { ...message.grid, originX: message.grid.originX - envelope.originX, originY: message.grid.originY - envelope.originY }
     const response = processImage({ ...settings, sourceId: cropKey, source: { width: source.width, height: source.height, data: source.data }, crop: localCrop, grid: localGrid, sourceFile: undefined }, processingCaches)
     self.postMessage({ type: 'process-result', protocol: 1, requestId, result: response.result, durationMs: response.durationMs }, [response.result.data.buffer])
   } catch (error) {

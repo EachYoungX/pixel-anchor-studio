@@ -12,7 +12,6 @@ describe('large source sampling', () => {
       crop: { x: 0, y: 0, width: sourceWidth, height: sourceHeight },
       output: { width: geometry.outputWidth, height: geometry.outputHeight },
       grid: { cellSize: geometry.cellSize, originX: geometry.originX, originY: geometry.originY },
-      scaleOffset: { x: 0, y: 0 },
       processing: { sampling: 'average', quantize: false, maxColors: 64, cleanup: 'off', preserveAlpha: true, transparentThreshold: 24 },
     })
 

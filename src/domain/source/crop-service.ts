@@ -28,3 +28,8 @@ export function centerSquareRect(width: number, height: number): Rect {
   const side = Math.min(width, height)
   return { x: (width - side) / 2, y: (height - side) / 2, width: side, height: side }
 }
+
+export function normalizeSourceAnchor(rect: Rect, sourceWidth: number, sourceHeight: number): Rect {
+  const side = Math.max(4, Math.min(rect.width, rect.height, sourceWidth, sourceHeight))
+  return clampSourceRect({ ...rect, width: side, height: side }, sourceWidth, sourceHeight, 4)
+}

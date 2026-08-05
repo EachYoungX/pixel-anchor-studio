@@ -38,7 +38,7 @@ function request(): ProcessRequest {
     source: { width: 1, height: 1, data: new Uint8ClampedArray([1, 2, 3, 255]) },
     crop: { x: 0, y: 0, width: 1, height: 1 },
     output: { width: 1, height: 1 },
-    scaleOffset: { x: 0, y: 0 },
+    grid: { cellSize: 1, originX: 0, originY: 0 },
     processing: { sampling: 'nearest', quantize: false, maxColors: 2, cleanup: 'off', preserveAlpha: true, transparentThreshold: 24 },
   }
 }

@@ -7,7 +7,7 @@ function request(data: number[]): ProcessRequest {
     source: { width: 2, height: 1, data: new Uint8ClampedArray(data) },
     crop: { x: 0, y: 0, width: 2, height: 1 },
     output: { width: 1, height: 1 },
-    scaleOffset: { x: 0, y: 0 },
+    grid: { cellSize: 2, originX: 0, originY: 0 },
     processing: { sampling: 'median', quantize: false, maxColors: 64, cleanup: 'off', preserveAlpha: true, transparentThreshold: 24 },
   }
 }
@@ -33,7 +33,6 @@ describe('sampling', () => {
       crop: { x: 1, y: 0, width: 2, height: 1 },
       output: { width: 2, height: 1 },
       grid: { cellSize: 1, originX: 1, originY: 0 },
-      scaleOffset: { x: 0, y: 0 },
       processing: { sampling: 'nearest', quantize: false, maxColors: 64, cleanup: 'off', preserveAlpha: true, transparentThreshold: 24 },
     })
 

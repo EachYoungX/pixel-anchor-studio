@@ -1,4 +1,5 @@
 import { defaultBead, defaultProcessing, defaultScale } from '@/domain/project/defaults'
+import { normalizeSourceAnchor } from '@/domain/source/crop-service'
 import type { BeadSettings, ProcessingSettings, ScaleSettings, SerializedProject, SerializedSourceV4 } from '@/types/project'
 
 interface LegacyScaleSettings extends Partial<ScaleSettings> {
@@ -54,18 +55,22 @@ export function migrateProject(value: unknown): SerializedProject {
   const bead: BeadSettings = { ...defaultBead(), ...rawBead }
   const crop = (raw.crop ?? { x: 0, y: 0, width: 1, height: 1 }) as SerializedProject['crop']
   const rawCropSettings = raw.cropSettings as Partial<SerializedProject['cropSettings']> | undefined
+  const source = migrateSource(raw.source)
+  const rawAnchor = (raw.anchor ?? { x: 0, y: 0, width: 4, height: 4 }) as SerializedProject['anchor']
+  const sourceWidth = source?.width || Math.max(4, crop.x + crop.width)
+  const sourceHeight = source?.height || Math.max(4, crop.y + crop.height)
 
   return {
     format: 'pixel-anchor-project',
     version: 4,
     savedAt: typeof raw.savedAt === 'string' ? raw.savedAt : new Date().toISOString(),
-    source: migrateSource(raw.source),
+    source,
     crop,
     cropSettings: {
       mode: rawCropSettings?.mode ?? 'custom',
       customRect: rawCropSettings?.customRect ?? crop,
     },
-    anchor: (raw.anchor ?? { x: 0, y: 0, width: 4, height: 4 }) as SerializedProject['anchor'],
+    anchor: normalizeSourceAnchor(rawAnchor, sourceWidth, sourceHeight),
     scale,
     processing,
     bead,

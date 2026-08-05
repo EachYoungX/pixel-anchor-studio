@@ -10,9 +10,7 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function legacyBounds(request: ProcessRequest, x: number, y: number): Bounds {
-  const cellSize = request.grid?.cellSize ?? Math.max(request.crop.width / request.output.width, request.crop.height / request.output.height)
-  const originX = request.grid?.originX ?? request.crop.x + request.scaleOffset.x * cellSize
-  const originY = request.grid?.originY ?? request.crop.y + request.scaleOffset.y * cellSize
+  const { cellSize, originX, originY } = request.grid
   return {
     x0: clamp(originX + x * cellSize, request.crop.x, Math.min(request.source.width, request.crop.x + request.crop.width)),
     y0: clamp(originY + y * cellSize, request.crop.y, Math.min(request.source.height, request.crop.y + request.crop.height)),
@@ -123,7 +121,7 @@ function makeRequest(
   const data = new Uint8ClampedArray(width * height * 4)
   for (let y = 0; y < height; y += 1) for (let x = 0; x < width; x += 1) data.set(pixel(x, y), (y * width + x) * 4)
   return {
-    source: { width, height, data }, ...geometry, scaleOffset: { x: 0, y: 0 },
+    source: { width, height, data }, ...geometry,
     processing: { sampling: 'median', quantize: false, maxColors: 64, cleanup: 'off', preserveAlpha: true, transparentThreshold: 24 },
   }
 }

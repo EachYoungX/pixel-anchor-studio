@@ -42,10 +42,8 @@ function createMedianWorkspace(): MedianWorkspace {
 }
 
 export function buildCellBounds(request: ProcessRequest): CellBounds {
-  const { crop, output, scaleOffset, source } = request
-  const cellSize = request.grid?.cellSize ?? Math.max(crop.width / output.width, crop.height / output.height)
-  const originX = request.grid?.originX ?? crop.x + scaleOffset.x * cellSize
-  const originY = request.grid?.originY ?? crop.y + scaleOffset.y * cellSize
+  const { crop, output, source } = request
+  const { cellSize, originX, originY } = request.grid
   const cropRight = Math.min(source.width, crop.x + crop.width)
   const cropBottom = Math.min(source.height, crop.y + crop.height)
   const rawXStarts = new Float64Array(output.width)

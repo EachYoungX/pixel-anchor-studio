@@ -18,7 +18,6 @@ function request(overrides: Partial<ProcessRequest['processing']> = {}, grid = {
     crop: { x: 0, y: 0, width: 2, height: 2 },
     output: { width: 1, height: 1 },
     grid,
-    scaleOffset: { x: 0, y: 0 },
     processing: {
       sampling: 'median',
       quantize: true,

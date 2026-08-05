@@ -11,7 +11,7 @@ import type { SourceRuntime } from '@/domain/source/source-types'
 import type { SourcePreview } from '@/runtime/source-preview'
 import { createPaletteSnapshot, replacePaletteColor } from '@/domain/palette/palette-service'
 import { serializeProject } from '@/domain/project/serialization'
-import { centerSquareRect, clampSourceRect, fullSourceRect, snapSourceRect } from '@/domain/source/crop-service'
+import { centerSquareRect, clampSourceRect, fullSourceRect, normalizeSourceAnchor, snapSourceRect } from '@/domain/source/crop-service'
 import { floodFillRgba, pixelMatchesRgba, readPixelHex, setPixelRgba, type DirtyBounds } from '@/domain/editor/pixel-operations'
 import { clonePixelResult } from '@/domain/editor/history'
 import { EditorSession } from '@/domain/editor/editor-session'
@@ -153,7 +153,7 @@ export const useProjectStore = defineStore('project', () => {
     const square = Math.max(4, Math.min(next.width, next.height))
     const nextAnchor = { ...next, width: square, height: square }
     const snapped = scale.snapMode === 'source-pixel' ? snapSourceRect(nextAnchor) : nextAnchor
-    Object.assign(anchor, clampSourceRect(snapped, source.value.width, source.value.height, 4))
+    Object.assign(anchor, normalizeSourceAnchor(snapped, source.value.width, source.value.height))
   }
 
   function useCustomCrop(): void {
@@ -210,7 +210,6 @@ export const useProjectStore = defineStore('project', () => {
           originX: dimensions.geometry.originX,
           originY: dimensions.geometry.originY,
         },
-        scaleOffset: { x: scale.offsetX, y: scale.offsetY },
         processing: { ...toRaw(processing) },
       }, sourceId.value, () => {
         if (!sourceImage.value) throw new Error('原图兼容数据不可用，请重新导入图片')
@@ -408,7 +407,9 @@ export const useProjectStore = defineStore('project', () => {
     }
     Object.assign(crop, project.cropSettings.customRect)
     cropSettings.mode = project.cropSettings.mode
-    Object.assign(anchor, project.anchor)
+    const sourceWidth = source.value?.width ?? Math.max(4, project.crop.x + project.crop.width)
+    const sourceHeight = source.value?.height ?? Math.max(4, project.crop.y + project.crop.height)
+    Object.assign(anchor, normalizeSourceAnchor(project.anchor, sourceWidth, sourceHeight))
     Object.assign(scale, project.scale)
     Object.assign(processing, project.processing)
     Object.assign(bead, project.bead)

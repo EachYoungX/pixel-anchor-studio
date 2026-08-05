@@ -5,6 +5,7 @@ import { useViewportController } from '@/composables/useViewportController'
 import { useCanvasGestures } from '@/composables/useCanvasGestures'
 import { useRafDraw } from '@/composables/useRafDraw'
 import { calculateOutputDimensions } from '@/core/dimensions'
+import { calculateGridPreviewBounds, calculateGridPreviewStride, gridPreviewIndices } from '@/core/grid-preview'
 import { clampSourceRect, snapSourceRect } from '@/domain/source/crop-service'
 import type { Rect } from '@/types/project'
 
@@ -97,26 +98,26 @@ function drawGrid(context: CanvasRenderingContext2D, cropRect: Rect): void {
   const crop = toScreen(cropRect)
   const output = calculateOutputDimensions(cropRect, displayedAnchor.value, store.scale)
   const geometry = output.geometry
-  const stepX = Math.max(1, Math.ceil(output.width / 64))
-  const stepY = Math.max(1, Math.ceil(output.height / 64))
+  const stride = calculateGridPreviewStride(output.width, output.height, geometry.cellSize * view.scale)
+  const bounds = calculateGridPreviewBounds(geometry, view.scale, view.offsetX, view.offsetY)
   context.save()
   context.beginPath()
   context.rect(crop.x, crop.y, crop.width, crop.height)
   context.clip()
   context.strokeStyle = 'rgba(52, 73, 94, 0.30)'
   context.lineWidth = 1
-  for (let x = 0; x <= output.width; x += stepX) {
+  for (const x of gridPreviewIndices(output.width, stride)) {
     const position = view.offsetX + (geometry.originX + x * geometry.cellSize) * view.scale
     context.beginPath()
-    context.moveTo(Math.round(position) + 0.5, crop.y)
-    context.lineTo(Math.round(position) + 0.5, crop.y + crop.height)
+    context.moveTo(Math.round(position) + 0.5, bounds.top)
+    context.lineTo(Math.round(position) + 0.5, bounds.bottom)
     context.stroke()
   }
-  for (let y = 0; y <= output.height; y += stepY) {
+  for (const y of gridPreviewIndices(output.height, stride)) {
     const position = view.offsetY + (geometry.originY + y * geometry.cellSize) * view.scale
     context.beginPath()
-    context.moveTo(crop.x, Math.round(position) + 0.5)
-    context.lineTo(crop.x + crop.width, Math.round(position) + 0.5)
+    context.moveTo(bounds.left, Math.round(position) + 0.5)
+    context.lineTo(bounds.right, Math.round(position) + 0.5)
     context.stroke()
   }
   context.restore()

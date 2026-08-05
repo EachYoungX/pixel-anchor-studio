@@ -11,7 +11,6 @@ describe('sampling golden fixture', () => {
         crop: fixture.crop,
         output: fixture.output,
         grid: fixture.grid,
-        scaleOffset: { x: 0, y: 0 },
         processing: { sampling: mode, quantize: false, maxColors: 64, cleanup: 'off', preserveAlpha: true, transparentThreshold: 24 },
       }
       expect([...sampleImage(request)]).toEqual(fixture.expected[mode])

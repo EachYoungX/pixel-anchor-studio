@@ -36,7 +36,7 @@ export function calculateOutputDimensions(
   }
 
   if (settings.mode === 'anchor') {
-    const anchorSide = Math.max(1, (anchor.width + anchor.height) / 2)
+    const anchorSide = Math.max(1, anchor.width)
     const sourceCellSize = anchorSide / Math.max(1, settings.anchorCells)
     const geometry = createGridGeometry(crop, sourceCellSize, settings.offsetX, settings.offsetY)
     return {

@@ -31,7 +31,6 @@ function request(
     crop: { x: 0, y: 0, width: source.width, height: source.height },
     output,
     grid: { cellSize: Math.max(source.width / output.width, source.height / output.height), originX: 0, originY: 0 },
-    scaleOffset: { x: 0, y: 0 },
     processing: { sampling, quantize: false, maxColors: 64, cleanup: 'off', preserveAlpha: true, transparentThreshold: 24 },
   }
 }

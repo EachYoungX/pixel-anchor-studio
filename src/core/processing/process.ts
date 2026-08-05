@@ -33,9 +33,9 @@ export function processImage(request: ProcessRequest, caches = createProcessingC
   const dimensions = {
     width: request.output.width,
     height: request.output.height,
-    cellSize: request.grid?.cellSize ?? Math.max(request.crop.width / request.output.width, request.crop.height / request.output.height),
-    originX: request.grid?.originX ?? request.crop.x + request.scaleOffset.x * (request.grid?.cellSize ?? Math.max(request.crop.width / request.output.width, request.crop.height / request.output.height)),
-    originY: request.grid?.originY ?? request.crop.y + request.scaleOffset.y * (request.grid?.cellSize ?? Math.max(request.crop.width / request.output.width, request.crop.height / request.output.height)),
+    cellSize: request.grid.cellSize,
+    originX: request.grid.originX,
+    originY: request.grid.originY,
   }
   const samplingKey = `${createSamplingFingerprint({
     sourceRevision,
