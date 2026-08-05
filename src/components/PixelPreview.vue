@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useProjectStore } from '@/stores/project'
 import type { PixelTool } from '@/types/project'
 import { useViewportController } from '@/composables/useViewportController'
@@ -109,7 +109,7 @@ function drawImage(): void {
   fullImageDraw = false
 }
 
-const { scheduleDraw } = useRafDraw(drawImage)
+const { scheduleDraw, cancelDraw } = useRafDraw(drawImage)
 
 function resetView(): void {
   const result = store.result
@@ -163,6 +163,15 @@ function handlePrimaryPointerUp(event: PointerEvent): void {
   scheduleDraw()
 }
 
+function abortPixelInteraction(): void {
+  store.cancelPixelEdit()
+  transactionOpen.value = false
+  painting.value = false
+  lastPixel = ''
+  fullImageDraw = true
+  scheduleDraw()
+}
+
 const gestures = useCanvasGestures({
   element: viewport,
   viewport: viewportController,
@@ -171,13 +180,8 @@ const gestures = useCanvasGestures({
   onPrimaryPointerDown: handlePrimaryPointerDown,
   onPrimaryPointerMove: handlePrimaryPointerMove,
   onPrimaryPointerUp: handlePrimaryPointerUp,
-  onPointerCaptureLost: () => {
-    if (transactionOpen.value) store.cancelPixelEdit()
-    transactionOpen.value = false
-    painting.value = false
-    lastPixel = ''
-    scheduleDraw()
-  },
+  onPrimaryPointerCancel: abortPixelInteraction,
+  onInteractionAbort: abortPixelInteraction,
 })
 
 function handleDoubleClick(event: MouseEvent): void {
@@ -196,6 +200,11 @@ watch(
   { deep: false },
 )
 
+watch(
+  () => store.resultRevision,
+  () => scheduleDraw(),
+)
+
 onMounted(() => {
   observer = new ResizeObserver(() => {
     if (viewportController.mode.value === 'fit') resetView()
@@ -203,6 +212,12 @@ onMounted(() => {
   })
   if (viewport.value) observer.observe(viewport.value)
   scheduleDraw()
+})
+
+onBeforeUnmount(() => {
+  observer?.disconnect()
+  abortPixelInteraction()
+  cancelDraw()
 })
 </script>
 

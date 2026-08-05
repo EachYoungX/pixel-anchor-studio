@@ -20,6 +20,16 @@ export function snapSourceRect(rect: Rect): Rect {
   }
 }
 
+export function snapSourceRectToGrid(rect: Rect, cellSize: number, originX: number, originY: number): Rect {
+  const step = Math.max(0.25, cellSize)
+  return {
+    x: originX + Math.round((rect.x - originX) / step) * step,
+    y: originY + Math.round((rect.y - originY) / step) * step,
+    width: Math.max(step, Math.round(rect.width / step) * step),
+    height: Math.max(step, Math.round(rect.height / step) * step),
+  }
+}
+
 export function fullSourceRect(width: number, height: number): Rect {
   return { x: 0, y: 0, width, height }
 }

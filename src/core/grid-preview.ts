@@ -1,5 +1,11 @@
 import type { GridGeometry } from '@/core/grid-geometry'
 
+export type GridGeometrySignature = readonly [number, number, number, number, number]
+
+export function createGridGeometrySignature(geometry: GridGeometry): GridGeometrySignature {
+  return [geometry.cellSize, geometry.originX, geometry.originY, geometry.coverageWidth, geometry.coverageHeight]
+}
+
 export interface GridPreviewBounds {
   left: number
   top: number

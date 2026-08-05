@@ -196,6 +196,13 @@ test('imports, processes, edits, and keeps both canvas viewports aligned', async
   expect(zoomedGridRendering.strokeWidth).toBe('1px')
   expect(zoomedGridRendering.vectorEffect).toBe('non-scaling-stroke')
 
+  const pixelCanvas = page.locator('canvas.pixel-canvas')
+  const beforeManualMerge = await pixelCanvas.screenshot()
+  await page.locator('.merge-button:not(:disabled)').first().click()
+  await expect.poll(async () => (await pixelCanvas.screenshot()).equals(beforeManualMerge)).toBe(false)
+  await page.getByRole('button', { name: '撤销' }).click()
+  await expect(page.getByRole('button', { name: '撤销' })).toBeDisabled()
+
   await page.keyboard.down('Space')
   await page.mouse.move(viewportBox!.x + 80, viewportBox!.y + 80)
   await page.mouse.down()
@@ -227,7 +234,6 @@ test('imports, processes, edits, and keeps both canvas viewports aligned', async
 
   await page.getByRole('button', { name: '画笔' }).click()
   await page.locator('.color-picker').fill('#01fe02')
-  const pixelCanvas = page.locator('canvas.pixel-canvas')
   await page.keyboard.down('Control')
   await page.mouse.move(viewportBox!.x + viewportBox!.width / 2, viewportBox!.y + viewportBox!.height / 2)
   await page.mouse.wheel(0, -240)
@@ -241,9 +247,13 @@ test('imports, processes, edits, and keeps both canvas viewports aligned', async
   const pixelCanvasBox = await pixelCanvas.boundingBox()
   expect(pixelCanvasBox).not.toBeNull()
   const targetPixel = { x: 5, y: 4 }
-  await pixelCanvas.click({ position: {
+  const targetPosition = {
     x: (targetPixel.x + 0.5) * pixelCanvasBox!.width / 32,
     y: (targetPixel.y + 0.5) * pixelCanvasBox!.height / 21,
+  }
+  await pixelCanvas.click({ position: {
+    x: targetPosition.x,
+    y: targetPosition.y,
   } })
   await expect.poll(() => pixelCanvas.evaluate((canvas, target) => {
     const context = (canvas as HTMLCanvasElement).getContext('2d')

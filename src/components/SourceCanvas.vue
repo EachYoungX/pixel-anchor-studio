@@ -5,8 +5,8 @@ import { useViewportController } from '@/composables/useViewportController'
 import { useCanvasGestures } from '@/composables/useCanvasGestures'
 import { useRafDraw } from '@/composables/useRafDraw'
 import { calculateOutputDimensions } from '@/core/dimensions'
-import { calculateGridPreviewBounds, calculateGridPreviewStride, gridPreviewIndices } from '@/core/grid-preview'
-import { clampSourceRect, snapSourceRect } from '@/domain/source/crop-service'
+import { calculateGridPreviewBounds, calculateGridPreviewStride, createGridGeometrySignature, gridPreviewIndices } from '@/core/grid-preview'
+import { clampSourceRect, snapSourceRect, snapSourceRectToGrid } from '@/domain/source/crop-service'
 import type { Rect } from '@/types/project'
 
 const store = useProjectStore()
@@ -29,8 +29,7 @@ interface DragState {
   startX: number
   startY: number
   startRect: Rect
-  snapStepX: number
-  snapStepY: number
+  snapStep: number
   snapOriginX: number
   snapOriginY: number
 }
@@ -44,6 +43,9 @@ const activeRect = computed(() => (store.editTarget === 'anchor' ? store.anchor 
 const displayedRect = computed(() => draftRect.value ?? activeRect.value)
 const displayedCrop = computed(() => store.editTarget === 'crop' && draftRect.value ? draftRect.value : store.effectiveCrop)
 const displayedAnchor = computed(() => store.editTarget === 'anchor' && draftRect.value ? draftRect.value : store.anchor)
+const gridGeometrySignature = computed(() => createGridGeometrySignature(
+  calculateOutputDimensions(displayedCrop.value, displayedAnchor.value, store.scale).geometry,
+))
 
 function baseFitScale(): number {
   if (!store.source) return 1
@@ -244,16 +246,16 @@ function onPrimaryPointerDown(event: PointerEvent): void {
   const current = { ...activeRect.value }
   const handle = detectHandle(point, current)
   if (!handle && !contains(point, current)) return
+  const geometry = store.outputDimensions.geometry
   drag = {
     action: handle ? 'resize' : 'move',
     handle,
     startX: point.x,
     startY: point.y,
     startRect: current,
-    snapStepX: store.effectiveCrop.width / Math.max(1, store.outputDimensions.width),
-    snapStepY: store.effectiveCrop.height / Math.max(1, store.outputDimensions.height),
-    snapOriginX: store.effectiveCrop.x,
-    snapOriginY: store.effectiveCrop.y,
+    snapStep: geometry.cellSize,
+    snapOriginX: geometry.originX,
+    snapOriginY: geometry.originY,
   }
   draftRect.value = current
   canvas.value.setPointerCapture(event.pointerId)
@@ -301,10 +303,7 @@ function onPointerMove(event: PointerEvent): void {
   }
   const canTargetSnap = store.scale.snapMode === 'target-cell' && !(store.editTarget === 'anchor' && drag.action === 'resize')
   if (canTargetSnap) {
-    next.x = drag.snapOriginX + Math.round((next.x - drag.snapOriginX) / drag.snapStepX) * drag.snapStepX
-    next.y = drag.snapOriginY + Math.round((next.y - drag.snapOriginY) / drag.snapStepY) * drag.snapStepY
-    next.width = Math.max(drag.snapStepX, Math.round(next.width / drag.snapStepX) * drag.snapStepX)
-    next.height = Math.max(drag.snapStepY, Math.round(next.height / drag.snapStepY) * drag.snapStepY)
+    next = snapSourceRectToGrid(next, drag.snapStep, drag.snapOriginX, drag.snapOriginY)
   }
   if (store.source) {
     if (store.editTarget === 'anchor') {
@@ -330,7 +329,7 @@ function onPointerUp(event: PointerEvent): void {
   scheduleDraw()
 }
 
-function onPointerCaptureLost(): void {
+function abortDrag(): void {
   draftRect.value = null
   drag = null
   scheduleDraw()
@@ -350,13 +349,14 @@ const gestures = useCanvasGestures({
   onPrimaryPointerDown,
   onPrimaryPointerMove: onPointerMove,
   onPrimaryPointerUp: onPointerUp,
-  onPointerCaptureLost,
+  onPrimaryPointerCancel: abortDrag,
+  onInteractionAbort: abortDrag,
 })
 
-const { scheduleDraw } = useRafDraw(draw)
+const { scheduleDraw, cancelDraw } = useRafDraw(draw)
 
 watch(
-  () => [store.source, store.effectiveCrop.x, store.effectiveCrop.y, store.effectiveCrop.width, store.effectiveCrop.height, store.anchor.x, store.anchor.y, store.anchor.width, store.scale.mode, store.scale.offsetX, store.scale.offsetY, store.outputDimensions.width, store.outputDimensions.height, store.editTarget, showGrid.value],
+  () => [store.source, store.effectiveCrop.x, store.effectiveCrop.y, store.effectiveCrop.width, store.effectiveCrop.height, store.anchor.x, store.anchor.y, store.anchor.width, store.scale.mode, ...gridGeometrySignature.value, store.editTarget, showGrid.value],
   () => nextTick(scheduleDraw),
   { deep: false },
 )
@@ -394,6 +394,8 @@ function onCanvasKeydown(event: KeyboardEvent): void {
 
 onBeforeUnmount(() => {
   observer?.disconnect()
+  abortDrag()
+  cancelDraw()
 })
 </script>
 

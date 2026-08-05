@@ -12,6 +12,8 @@ export interface CanvasGestureOptions {
   onPrimaryPointerDown?: (event: PointerEvent, point: Point) => void
   onPrimaryPointerMove?: (event: PointerEvent, point: Point) => void
   onPrimaryPointerUp?: (event: PointerEvent, point: Point) => void
+  onPrimaryPointerCancel?: (event: PointerEvent, point: Point) => void
+  onInteractionAbort?: () => void
   onPointerCaptureLost?: () => void
 }
 
@@ -42,6 +44,7 @@ export function useCanvasGestures(options: CanvasGestureOptions) {
   function onLostPointerCapture(): void {
     panning.value = false
     options.onPointerCaptureLost?.()
+    options.onInteractionAbort?.()
   }
 
   function onPointerDown(event: PointerEvent): void {
@@ -78,7 +81,8 @@ export function useCanvasGestures(options: CanvasGestureOptions) {
   }
 
   function onPointerCancel(event: PointerEvent): void {
-    onPointerUp(event)
+    panning.value = false
+    options.onPrimaryPointerCancel?.(event, options.getLocalPoint(event))
   }
 
   function onWheel(event: WheelEvent): void {
@@ -104,6 +108,7 @@ export function useCanvasGestures(options: CanvasGestureOptions) {
   function onWindowBlur(): void {
     spacePressed.value = false
     panning.value = false
+    options.onInteractionAbort?.()
   }
 
   onMounted(() => {
@@ -112,6 +117,7 @@ export function useCanvasGestures(options: CanvasGestureOptions) {
     window.addEventListener('blur', onWindowBlur)
   })
   onBeforeUnmount(() => {
+    options.onInteractionAbort?.()
     window.removeEventListener('keydown', onKeyDown)
     window.removeEventListener('keyup', onKeyUp)
     window.removeEventListener('blur', onWindowBlur)

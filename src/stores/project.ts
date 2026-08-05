@@ -58,6 +58,8 @@ export const useProjectStore = defineStore('project', () => {
   const history = ref<HistoryEntry[]>([])
   const future = ref<HistoryEntry[]>([])
   const pixelEditDirtyBounds = ref<DirtyBounds | null>(null)
+  const resultRevisionState = ref(0)
+  const resultRevision = computed(() => resultRevisionState.value)
   const canUndo = computed(() => history.value.length > 0)
   const canRedo = computed(() => future.value.length > 0)
   const undoLabel = computed(() => history.value[history.value.length - 1]?.label ?? '撤销')
@@ -65,7 +67,6 @@ export const useProjectStore = defineStore('project', () => {
   let latestProcessId = 0
   let sourceRevision = 0
   const sourceId = ref('source-0')
-  let generatedResultRevision = 0
   const processingService = new ProcessingService()
   const sourceSession = new SourceSession()
   const editorSession = new EditorSession()
@@ -112,8 +113,8 @@ export const useProjectStore = defineStore('project', () => {
 
   watch(paletteSort, refreshPalette)
 
-  function invalidateGeneratedResult(_reason: 'source' | 'crop' | 'scale' | 'processing' | 'manual-edit'): void {
-    generatedResultRevision += 1
+  function notifyResultChanged(): void {
+    resultRevisionState.value += 1
   }
 
   async function importImage(file: File): Promise<void> {
@@ -132,7 +133,7 @@ export const useProjectStore = defineStore('project', () => {
       height: anchorSide,
     }, loaded.source.width, loaded.source.height))
     result.value = null
-    invalidateGeneratedResult('source')
+    notifyResultChanged()
     palette.value = []
     history.value = []
     future.value = []
@@ -217,6 +218,7 @@ export const useProjectStore = defineStore('project', () => {
       })
       if (processId !== latestProcessId) return
       result.value = markRaw(response.result)
+      notifyResultChanged()
       lastDurationMs.value = response.durationMs
       history.value = []
       future.value = []
@@ -250,8 +252,8 @@ export const useProjectStore = defineStore('project', () => {
       if (history.value.length > 20) history.value.shift()
       future.value = []
     }
-    invalidateGeneratedResult('manual-edit')
     if (!setPixelRgba(result.value, x, y, rgba)) return
+    notifyResultChanged()
     if (editorSession.active) {
       const dirty = editorSession.recordChange(x, y)
       pixelEditDirtyBounds.value = { ...dirty }
@@ -278,6 +280,7 @@ export const useProjectStore = defineStore('project', () => {
     const before = editorSession.cancel()
     if (before && changed) {
       result.value = markRaw(before)
+      notifyResultChanged()
       const last = history.value[history.value.length - 1]
       if (last?.label === '画笔' || last?.label === '橡皮擦') history.value.pop()
       refreshPalette()
@@ -310,7 +313,7 @@ export const useProjectStore = defineStore('project', () => {
       history.value.pop()
       return
     }
-    invalidateGeneratedResult('manual-edit')
+    notifyResultChanged()
     refreshPalette()
   }
 
@@ -324,11 +327,11 @@ export const useProjectStore = defineStore('project', () => {
   function mergeColor(fromHex: string, toHex: string): void {
     if (!result.value || fromHex === toHex) return
     pushHistory('合并颜色')
-    invalidateGeneratedResult('manual-edit')
     if (!replacePaletteColor(result.value, fromHex, toHex)) {
       history.value.pop()
       return
     }
+    notifyResultChanged()
     refreshPalette()
   }
 
@@ -340,8 +343,8 @@ export const useProjectStore = defineStore('project', () => {
       return
     }
     pushHistory('合并相近色')
-    invalidateGeneratedResult('manual-edit')
     result.value = markRaw(merged.result)
+    notifyResultChanged()
     refreshPalette()
     status.value = merged.before === merged.after ? '没有找到符合条件的相近色' : `已合并相近色：${merged.before} 色 → ${merged.after} 色`
   }
@@ -351,7 +354,7 @@ export const useProjectStore = defineStore('project', () => {
     const previous = history.value.pop()!
     future.value.push({ label: previous.label, result: clonePixelResult(result.value) })
     result.value = markRaw(previous.result)
-    invalidateGeneratedResult('manual-edit')
+    notifyResultChanged()
     refreshPalette()
   }
 
@@ -360,7 +363,7 @@ export const useProjectStore = defineStore('project', () => {
     const next = future.value.pop()!
     history.value.push({ label: next.label, result: clonePixelResult(result.value) })
     result.value = markRaw(next.result)
-    invalidateGeneratedResult('manual-edit')
+    notifyResultChanged()
     refreshPalette()
   }
 
@@ -437,6 +440,7 @@ export const useProjectStore = defineStore('project', () => {
     processing,
     bead,
     result,
+    resultRevision,
     palette,
     selectedColor,
     mergeStrength,
