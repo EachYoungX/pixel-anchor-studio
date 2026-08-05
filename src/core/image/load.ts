@@ -1,5 +1,5 @@
 import { markRaw } from 'vue'
-import type { SourceState } from '@/types/project'
+import type { SourceRuntime } from '@/domain/source/source-types'
 
 const MAX_SOURCE_PIXELS = 40_000_000
 
@@ -12,7 +12,7 @@ export function loadHtmlImage(dataUrl: string): Promise<HTMLImageElement> {
   })
 }
 
-export async function loadSourceFile(file: File): Promise<{ source: SourceState; image: HTMLImageElement; estimatedRgbaBytes: number }> {
+export async function loadSourceFile(file: File): Promise<{ source: SourceRuntime; image: HTMLImageElement; estimatedRgbaBytes: number }> {
   if (!file.type.startsWith('image/')) throw new Error('请选择PNG、JPEG、WebP或其他浏览器支持的图片')
   const previewUrl = URL.createObjectURL(file)
   let image: HTMLImageElement
@@ -30,7 +30,7 @@ export async function loadSourceFile(file: File): Promise<{ source: SourceState;
   return {
     source: {
       name: file.name,
-      dataUrl: '',
+      mime: file.type,
       previewUrl,
       file: markRaw(file),
       width: image.naturalWidth,

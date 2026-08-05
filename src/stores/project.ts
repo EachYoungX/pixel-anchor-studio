@@ -1,16 +1,18 @@
 import { computed, markRaw, reactive, ref, toRaw, watch } from 'vue'
 import { defineStore } from 'pinia'
-import { hexToRgba, rgbToHsl, rgbaToHex } from '@/core/color'
+import { hexToRgba } from '@/core/color'
 import { calculateOutputDimensions } from '@/core/dimensions'
-import { buildPalette } from '@/core/palette'
 import { mergeSimilarColors } from '@/core/processing/palette-merge'
-import { base64ToBytes, bytesToBase64 } from '@/core/export/project'
+import { base64ToBytes } from '@/core/export/project'
 import { ProcessingService } from '@/domain/processing/processing-service'
 import { SourceSession } from '@/domain/source/source-session'
 import { imageToImageData } from '@/core/image/load'
-import type { DirtyBounds } from '@/domain/editor/pixel-operations'
+import type { SourceRuntime } from '@/domain/source/source-types'
+import { createPaletteSnapshot, replacePaletteColor } from '@/domain/palette/palette-service'
+import { serializeProject } from '@/domain/project/serialization'
+import { floodFillRgba, pixelMatchesRgba, readPixelHex, setPixelRgba, type DirtyBounds } from '@/domain/editor/pixel-operations'
 import { EditorSession } from '@/domain/editor/editor-session'
-import { defaultBead, defaultProcessing, defaultScale, defaultSnapSettings } from '@/domain/project/defaults'
+import { defaultBead, defaultProcessing, defaultScale } from '@/domain/project/defaults'
 import type {
   BeadSettings,
   CropMode,
@@ -25,7 +27,6 @@ import type {
   Rect,
   ScaleSettings,
   SerializedProject,
-  SourceState,
   ScaleMode,
   SnapSettings,
 } from '@/types/project'
@@ -53,9 +54,8 @@ function cloneResult(result: PixelResult): PixelResult {
 }
 
 export const useProjectStore = defineStore('project', () => {
-  const source = ref<SourceState | null>(null)
+  const source = ref<SourceRuntime | null>(null)
   const sourceImage = ref<HTMLImageElement | null>(null)
-  const sourceImageData = ref<ImageData | null>(null)
   const crop = reactive<Rect>({ x: 0, y: 0, width: 1, height: 1 })
   const cropSettings = reactive({ mode: 'custom' as CropMode, customRect: crop })
   const anchor = reactive<Rect>({ x: 0, y: 0, width: 32, height: 32 })
@@ -96,7 +96,6 @@ export const useProjectStore = defineStore('project', () => {
     sourceId.value = `source-${sourceRevision}`
     source.value = null
     sourceImage.value = null
-    sourceImageData.value = null
     result.value = null
     palette.value = []
     colorCodes.value = {}
@@ -116,7 +115,7 @@ export const useProjectStore = defineStore('project', () => {
     return crop
   })
   const outputDimensions = computed(() => calculateOutputDimensions(effectiveCrop.value, anchor, scale))
-  const canProcess = computed(() => Boolean(source.value && (source.value.file || sourceImageData.value)))
+  const canProcess = computed(() => Boolean(source.value))
   const beadCount = computed(() => palette.value.reduce((total, entry) => total + entry.count, 0))
   const canExportBead = computed(() => Boolean(result.value && palette.value.length > 0 && palette.value.length <= bead.maxColors))
   const sourceLabel = computed(() => {
@@ -125,26 +124,10 @@ export const useProjectStore = defineStore('project', () => {
   })
 
   function refreshPalette(): void {
-    const built = buildPalette(result.value, colorCodes.value)
-    palette.value = [...built.entries].sort((a, b) => {
-      if (paletteSort.value === 'code') return a.code.localeCompare(b.code)
-      if (paletteSort.value === 'lightness') return (a.rgba[0] + a.rgba[1] + a.rgba[2]) - (b.rgba[0] + b.rgba[1] + b.rgba[2])
-      if (paletteSort.value === 'hue') {
-        const colorA = rgbToHsl(a.rgba[0], a.rgba[1], a.rgba[2])
-        const colorB = rgbToHsl(b.rgba[0], b.rgba[1], b.rgba[2])
-        const grayA = colorA.saturation < 0.08
-        const grayB = colorB.saturation < 0.08
-        if (grayA !== grayB) return grayA ? 1 : -1
-        if (!grayA && colorA.hue !== colorB.hue) return colorA.hue - colorB.hue
-        if (colorA.saturation !== colorB.saturation) return colorB.saturation - colorA.saturation
-        return colorA.lightness - colorB.lightness
-      }
-      return b.count - a.count
-    })
-    colorCodes.value = built.codeMap
-    if (palette.value.length > 0 && !palette.value.some((entry) => entry.hex === selectedColor.value)) {
-      selectedColor.value = palette.value.find((entry) => entry.rgba[3] > 0)?.hex ?? '#202124'
-    }
+    const snapshot = createPaletteSnapshot(result.value, colorCodes.value, paletteSort.value, selectedColor.value)
+    palette.value = snapshot.entries
+    colorCodes.value = snapshot.codeMap
+    selectedColor.value = snapshot.selectedColor
   }
 
   watch(paletteSort, refreshPalette)
@@ -158,7 +141,6 @@ export const useProjectStore = defineStore('project', () => {
     const loaded = await sourceSession.openFile(file)
     source.value = loaded.source
     sourceImage.value = markRaw(loaded.image)
-    sourceImageData.value = null
     Object.assign(crop, { x: 0, y: 0, width: loaded.source.width, height: loaded.source.height })
     cropSettings.mode = 'custom'
     const anchorSide = Math.max(8, Math.min(loaded.source.width, loaded.source.height) * 0.12)
@@ -212,8 +194,8 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   function setScaleMode(mode: ScaleMode): void {
-    const settings = scale.snapSettings ?? defaultSnapSettings()
-    if (scale.snapMode) settings[scale.mode] = scale.snapMode
+    const settings = { ...scale.snapSettings }
+    settings[scale.mode] = scale.snapMode
     scale.snapSettings = settings
     scale.mode = mode
     editTarget.value = mode === 'anchor' ? 'anchor' : 'crop'
@@ -226,19 +208,18 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   async function process(): Promise<void> {
-    if (!source.value || (!source.value.file && !sourceImageData.value)) return
+    if (!source.value) return
     const processId = ++latestProcessId
     isProcessing.value = true
     status.value = '正在生成像素矩阵'
     try {
       const dimensions = outputDimensions.value
-      const sourceData = sourceImageData.value?.data ?? new Uint8ClampedArray()
       const response = await processingService.process({
         sourceId: sourceId.value,
         source: {
           width: source.value.width,
           height: source.value.height,
-          data: sourceData,
+          data: new Uint8ClampedArray(),
         },
         sourceFile: source.value.file,
         crop: { ...toRaw(effectiveCrop.value) },
@@ -281,8 +262,7 @@ export const useProjectStore = defineStore('project', () => {
   function setPixel(x: number, y: number, color = selectedColor.value, record = true, label = '像素编辑'): void {
     if (!result.value || x < 0 || y < 0 || x >= result.value.width || y >= result.value.height) return
     const rgba = hexToRgba(color)
-    const offset = (y * result.value.width + x) * 4
-    if (rgba.every((value, index) => value === result.value!.data[offset + index])) return
+    if (pixelMatchesRgba(result.value, x, y, rgba)) return
     if (record) pushHistory(label)
     else if (editorSession.active && !editorSession.hasChanges) {
       const entry = editorSession.historyEntry()
@@ -291,10 +271,7 @@ export const useProjectStore = defineStore('project', () => {
       future.value = []
     }
     invalidateGeneratedResult('manual-edit')
-    result.value.data[offset] = rgba[0]
-    result.value.data[offset + 1] = rgba[1]
-    result.value.data[offset + 2] = rgba[2]
-    result.value.data[offset + 3] = rgba[3]
+    if (!setPixelRgba(result.value, x, y, rgba)) return
     if (editorSession.active) {
       const dirty = editorSession.recordChange(x, y)
       pixelEditDirtyBounds.value = { ...dirty }
@@ -339,49 +316,21 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   function pickPixel(x: number, y: number): void {
-    if (!result.value || x < 0 || y < 0 || x >= result.value.width || y >= result.value.height) return
-    const offset = (y * result.value.width + x) * 4
-    selectedColor.value = rgbaToHex(
-      result.value.data[offset],
-      result.value.data[offset + 1],
-      result.value.data[offset + 2],
-      result.value.data[offset + 3],
-    )
+    if (!result.value) return
+    const color = readPixelHex(result.value, x, y)
+    if (!color) return
+    selectedColor.value = color
     pixelTool.value = 'brush'
   }
 
   function fillPixel(x: number, y: number): void {
-    if (!result.value || x < 0 || y < 0 || x >= result.value.width || y >= result.value.height) return
-    const width = result.value.width
-    const height = result.value.height
-    const start = y * width + x
-    const startOffset = start * 4
-    const target = [
-      result.value.data[startOffset],
-      result.value.data[startOffset + 1],
-      result.value.data[startOffset + 2],
-      result.value.data[startOffset + 3],
-    ]
-    const replacement = hexToRgba(selectedColor.value)
-    if (target.every((value, index) => value === replacement[index])) return
+    if (!result.value) return
     pushHistory('填充')
-    invalidateGeneratedResult('manual-edit')
-    const visited = new Uint8Array(width * height)
-    const queue = [start]
-    while (queue.length > 0) {
-      const current = queue.pop()!
-      if (visited[current]) continue
-      visited[current] = 1
-      const offset = current * 4
-      if (!target.every((value, index) => result.value!.data[offset + index] === value)) continue
-      result.value.data.set(replacement, offset)
-      const cx = current % width
-      const cy = Math.floor(current / width)
-      if (cx > 0) queue.push(current - 1)
-      if (cx + 1 < width) queue.push(current + 1)
-      if (cy > 0) queue.push(current - width)
-      if (cy + 1 < height) queue.push(current + width)
+    if (!floodFillRgba(result.value, x, y, hexToRgba(selectedColor.value))) {
+      history.value.pop()
+      return
     }
+    invalidateGeneratedResult('manual-edit')
     refreshPalette()
   }
 
@@ -394,30 +343,11 @@ export const useProjectStore = defineStore('project', () => {
 
   function mergeColor(fromHex: string, toHex: string): void {
     if (!result.value || fromHex === toHex) return
-    const from = hexToRgba(fromHex)
-    const to = hexToRgba(toHex)
-    let changed = false
-    for (let offset = 0; offset < result.value.data.length; offset += 4) {
-      if (
-        result.value.data[offset] === from[0] &&
-        result.value.data[offset + 1] === from[1] &&
-        result.value.data[offset + 2] === from[2] &&
-        result.value.data[offset + 3] === from[3]
-      ) {
-        changed = true
-        break
-      }
-    }
-    if (!changed) return
     pushHistory('合并颜色')
     invalidateGeneratedResult('manual-edit')
-    for (let offset = 0; offset < result.value.data.length; offset += 4) {
-      if (
-        result.value.data[offset] === from[0] &&
-        result.value.data[offset + 1] === from[1] &&
-        result.value.data[offset + 2] === from[2] &&
-        result.value.data[offset + 3] === from[3]
-      ) result.value.data.set(to, offset)
+    if (!replacePaletteColor(result.value, fromHex, toHex)) {
+      history.value.pop()
+      return
     }
     refreshPalette()
   }
@@ -455,40 +385,17 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   async function serialize(): Promise<SerializedProject> {
-    let sourceDataBase64 = ''
-    let sourceMime = 'image/png'
-    if (source.value?.file) {
-      sourceDataBase64 = bytesToBase64(new Uint8ClampedArray(await source.value.file.arrayBuffer()))
-      sourceMime = source.value.file.type || sourceMime
-    } else if (source.value?.dataUrl) {
-      const parts = source.value.dataUrl.split(',', 2)
-      sourceDataBase64 = parts[1] ?? ''
-      sourceMime = /^data:([^;,]+)/.exec(source.value.dataUrl)?.[1] ?? sourceMime
-    }
-    return {
-      format: 'pixel-anchor-project',
-      version: 4,
-      savedAt: new Date().toISOString(),
-      source: source.value
-        ? {
-            name: source.value.name,
-            mime: sourceMime,
-            width: source.value.width,
-            height: source.value.height,
-            dataBase64: sourceDataBase64,
-          }
-        : null,
+    return serializeProject({
+      source: source.value,
       crop: { ...toRaw(crop) },
       cropSettings: { mode: cropSettings.mode, customRect: { ...toRaw(crop) } },
       anchor: { ...toRaw(anchor) },
-      scale: { ...toRaw(scale) },
+      scale: { ...toRaw(scale), snapSettings: { ...scale.snapSettings } },
       processing: { ...toRaw(processing) },
       bead: { ...toRaw(bead) },
-      result: result.value
-        ? { width: result.value.width, height: result.value.height, dataBase64: bytesToBase64(result.value.data) }
-        : null,
-      colorCodes: { ...colorCodes.value },
-    }
+      result: result.value,
+      colorCodes: colorCodes.value,
+    })
   }
 
   async function loadSerialized(project: SerializedProject): Promise<void> {
@@ -501,14 +408,12 @@ export const useProjectStore = defineStore('project', () => {
       const loaded = await sourceSession.openBlob({ name: project.source.name, mime: project.source.mime, width: project.source.width, height: project.source.height, blob })
       source.value = loaded.source
       sourceImage.value = markRaw(loaded.image)
-      sourceImageData.value = null
     } else {
       source.value = null
       sourceImage.value = null
-      sourceImageData.value = null
     }
-    Object.assign(crop, project.cropSettings?.customRect ?? project.crop)
-    cropSettings.mode = project.cropSettings?.mode ?? 'custom'
+    Object.assign(crop, project.cropSettings.customRect)
+    cropSettings.mode = project.cropSettings.mode
     Object.assign(anchor, project.anchor)
     Object.assign(scale, project.scale)
     Object.assign(processing, project.processing)
@@ -530,7 +435,6 @@ export const useProjectStore = defineStore('project', () => {
   return {
     source,
     sourceImage,
-    sourceImageData,
     crop,
     anchor,
     scale,

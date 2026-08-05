@@ -13,6 +13,8 @@ function settings(overrides: Partial<ScaleSettings>): ScaleSettings {
     pseudoCellSize: 8,
     offsetX: 0,
     offsetY: 0,
+    snapMode: 'source-pixel',
+    snapSettings: { direct: 'source-pixel', anchor: 'source-pixel', pseudo: 'target-cell' },
     ...overrides,
   }
 }

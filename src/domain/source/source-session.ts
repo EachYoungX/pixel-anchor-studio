@@ -1,9 +1,9 @@
 import { markRaw } from 'vue'
 import { loadHtmlImage, loadSourceFile } from '@/core/image/load'
-import type { SourceState } from '@/types/project'
+import type { SourceRuntime } from '@/domain/source/source-types'
 
 export interface SourceSessionValue {
-  source: SourceState
+  source: SourceRuntime
   image: HTMLImageElement
   estimatedRgbaBytes: number
 }
@@ -23,7 +23,7 @@ export class SourceSession {
     try {
       const image = await loadHtmlImage(previewUrl)
       this.current = {
-        source: { name: input.name, dataUrl: '', previewUrl, file: markRaw(input.blob), width: input.width, height: input.height },
+        source: { name: input.name, mime: input.mime, previewUrl, file: markRaw(input.blob), width: input.width, height: input.height },
         image,
         estimatedRgbaBytes: input.width * input.height * 4,
       }

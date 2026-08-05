@@ -52,14 +52,19 @@ export function migrateProject(value: unknown): SerializedProject {
   const processing: ProcessingSettings = { ...defaultProcessing(), ...rawProcessing }
   const rawBead = (raw.bead ?? {}) as Partial<BeadSettings>
   const bead: BeadSettings = { ...defaultBead(), ...rawBead }
+  const crop = (raw.crop ?? { x: 0, y: 0, width: 1, height: 1 }) as SerializedProject['crop']
+  const rawCropSettings = raw.cropSettings as Partial<SerializedProject['cropSettings']> | undefined
 
   return {
     format: 'pixel-anchor-project',
     version: 4,
     savedAt: typeof raw.savedAt === 'string' ? raw.savedAt : new Date().toISOString(),
     source: migrateSource(raw.source),
-    crop: (raw.crop ?? { x: 0, y: 0, width: 1, height: 1 }) as SerializedProject['crop'],
-    cropSettings: raw.cropSettings as SerializedProject['cropSettings'],
+    crop,
+    cropSettings: {
+      mode: rawCropSettings?.mode ?? 'custom',
+      customRect: rawCropSettings?.customRect ?? crop,
+    },
     anchor: (raw.anchor ?? { x: 0, y: 0, width: 4, height: 4 }) as SerializedProject['anchor'],
     scale,
     processing,

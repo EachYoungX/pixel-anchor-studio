@@ -27,15 +27,6 @@ export interface CropSettings {
   customRect: Rect
 }
 
-export interface SourceState {
-  name: string
-  dataUrl: string
-  previewUrl?: string
-  file?: Blob
-  width: number
-  height: number
-}
-
 export interface SerializedSourceV4 {
   name: string
   mime: string
@@ -51,8 +42,8 @@ export interface ScaleSettings {
   pseudoCellSize: number
   offsetX: number
   offsetY: number
-  snapMode?: SnapMode
-  snapSettings?: SnapSettings
+  snapMode: SnapMode
+  snapSettings: SnapSettings
 }
 
 export interface ProcessingSettings {
@@ -102,7 +93,7 @@ export interface SerializedProject {
   savedAt: string
   source: SerializedSourceV4 | null
   crop: Rect
-  cropSettings?: CropSettings
+  cropSettings: CropSettings
   anchor: Rect
   scale: ScaleSettings
   processing: ProcessingSettings
