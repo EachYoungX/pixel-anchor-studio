@@ -11,7 +11,6 @@ const store = useProjectStore()
 const editorShell = ref<HTMLDivElement | null>(null)
 const viewport = ref<HTMLDivElement | null>(null)
 const imageCanvas = ref<HTMLCanvasElement | null>(null)
-const overlayCanvas = ref<HTMLCanvasElement | null>(null)
 const viewportController = useViewportController({
   initialZoom: 4,
   minZoom: 1,
@@ -38,9 +37,13 @@ const selectedColorForInput = computed({
 })
 
 const surfaceStyle = computed(() => ({
-  width: `${store.result?.width ?? 0}px`,
-  height: `${store.result?.height ?? 0}px`,
-  transform: `translate(${viewportController.panX.value}px, ${viewportController.panY.value}px) scale(${zoom.value})`,
+  width: `${(store.result?.width ?? 0) * zoom.value}px`,
+  height: `${(store.result?.height ?? 0) * zoom.value}px`,
+  transform: `translate(${viewportController.panX.value}px, ${viewportController.panY.value}px)`,
+}))
+
+const gridStyle = computed(() => ({
+  backgroundSize: `${zoom.value}px ${zoom.value}px`,
 }))
 
 function getLocalPoint(event: PointerEvent | WheelEvent): { x: number; y: number } {
@@ -86,40 +89,7 @@ function drawImage(): void {
   fullImageDraw = false
 }
 
-function drawOverlay(): void {
-  const canvas = overlayCanvas.value
-  const result = store.result
-  if (!canvas || !result) return
-  if (canvas.width !== result.width || canvas.height !== result.height) {
-    canvas.width = result.width
-    canvas.height = result.height
-  }
-  const context = canvas.getContext('2d')
-  if (!context) return
-  context.clearRect(0, 0, result.width, result.height)
-  if (!showGrid.value || zoom.value < 3) return
-  context.save()
-  context.strokeStyle = 'rgba(70, 75, 82, 0.28)'
-  context.lineWidth = 1 / zoom.value
-  context.beginPath()
-  for (let x = 0; x <= result.width; x += 1) {
-    context.moveTo(x, 0)
-    context.lineTo(x, result.height)
-  }
-  for (let y = 0; y <= result.height; y += 1) {
-    context.moveTo(0, y)
-    context.lineTo(result.width, y)
-  }
-  context.stroke()
-  context.restore()
-}
-
-function draw(): void {
-  drawImage()
-  drawOverlay()
-}
-
-const { scheduleDraw } = useRafDraw(draw)
+const { scheduleDraw } = useRafDraw(drawImage)
 
 function resetView(): void {
   const result = store.result
@@ -189,7 +159,7 @@ function handleDoubleClick(event: MouseEvent): void {
 }
 
 watch(
-  () => [store.result, showGrid.value],
+  () => store.result,
   () => nextTick(() => {
     fullImageDraw = true
     if (viewportController.mode.value === 'fit') resetView()
@@ -247,11 +217,11 @@ onMounted(() => {
     >
       <div class="pixel-surface" :style="surfaceStyle">
         <canvas ref="imageCanvas" class="pixel-canvas" />
-        <canvas ref="overlayCanvas" class="pixel-overlay" />
+        <div v-if="showGrid && zoom >= 3" class="pixel-grid" :style="gridStyle" aria-hidden="true" />
       </div>
     </div>
   </div>
-  <div v-else class="empty-state">
+  <div v-else class="canvas-empty-state checkerboard">
     生成预览后可在此查看像素结果并进行画笔、吸管、填充和透明处理。
   </div>
 </template>
@@ -260,8 +230,16 @@ onMounted(() => {
 .preview-shell { height: 100%; min-width: 0; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); }
 .pixel-viewport { position: relative; min-height: 0; min-width: 0; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
 .pixel-surface { position: absolute; left: 0; top: 0; transform-origin: 0 0; image-rendering: pixelated; }
-.pixel-canvas, .pixel-overlay { position: absolute; left: 0; top: 0; display: block; width: 100%; height: 100%; image-rendering: pixelated; }
-.pixel-overlay { pointer-events: none; }
+.pixel-canvas { position: absolute; left: 0; top: 0; display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+.pixel-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgba(70, 75, 82, 0.28) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(70, 75, 82, 0.28) 1px, transparent 1px);
+  box-shadow: inset 0 0 0 1px rgba(70, 75, 82, 0.28);
+}
 .grid-toggle { display: flex; align-items: center; gap: 5px; color: #60676f; font-size: 12px; white-space: nowrap; }
 .color-picker-label { display: flex; align-items: center; gap: 7px; color: #4f565e; font-size: 11px; }
 .color-picker { width: 30px; height: 26px; padding: 1px; border: 1px solid var(--border-strong); border-radius: 5px; background: #ffffff; }

@@ -86,18 +86,6 @@ function toScreen(rect: Rect): Rect {
   }
 }
 
-function drawChecker(context: CanvasRenderingContext2D, width: number, height: number): void {
-  context.fillStyle = '#F4F5F6'
-  context.fillRect(0, 0, width, height)
-  const size = 12
-  context.fillStyle = '#E7E9EC'
-  for (let y = 0; y < height; y += size) {
-    for (let x = 0; x < width; x += size) {
-      if ((x / size + y / size) % 2 === 0) context.fillRect(x, y, size, size)
-    }
-  }
-}
-
 function drawGrid(context: CanvasRenderingContext2D): void {
   if (!showGrid.value || !store.source) return
   const crop = toScreen(store.effectiveCrop)
@@ -181,7 +169,6 @@ function draw(): void {
   const dpr = Math.min(window.devicePixelRatio || 1, 2)
   context.setTransform(dpr, 0, 0, dpr, 0, 0)
   context.clearRect(0, 0, canvasCssSize.width, canvasCssSize.height)
-  drawChecker(context, canvasCssSize.width, canvasCssSize.height)
 
   if (!store.sourceImage || !store.source) {
     context.fillStyle = '#69717A'
@@ -385,7 +372,7 @@ onBeforeUnmount(() => {
     </div>
     <canvas
       ref="canvas"
-      class="source-canvas"
+      class="source-canvas checkerboard"
       @pointerdown="gestures.onPointerDown"
       @pointermove="gestures.onPointerMove"
       @pointerup="gestures.onPointerUp"

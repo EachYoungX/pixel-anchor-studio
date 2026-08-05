@@ -58,6 +58,27 @@ test('imports, processes, edits, and keeps both canvas viewports aligned', async
   page.on('pageerror', (error) => pageErrors.push(error.message))
   await page.goto('/')
 
+  const sourceCanvas = page.locator('canvas.source-canvas')
+  const resultEmptyState = page.locator('.canvas-empty-state')
+  await expect(resultEmptyState).toBeVisible()
+  const [sourceBackground, resultBackground, resultEmptyLayout] = await Promise.all([
+    sourceCanvas.evaluate((element) => getComputedStyle(element).backgroundImage),
+    resultEmptyState.evaluate((element) => getComputedStyle(element).backgroundImage),
+    resultEmptyState.evaluate((element) => {
+      const style = getComputedStyle(element)
+      return {
+        height: element.getBoundingClientRect().height,
+        parentHeight: element.parentElement?.getBoundingClientRect().height,
+        placeItems: style.placeItems,
+        userSelect: style.userSelect,
+      }
+    }),
+  ])
+  expect(resultBackground).toBe(sourceBackground)
+  expect(resultEmptyLayout.placeItems).toBe('center')
+  expect(resultEmptyLayout.userSelect).toBe('none')
+  expect(resultEmptyLayout.height).toBeCloseTo(resultEmptyLayout.parentHeight ?? 0, 0)
+
   await page.locator('input[type="file"]').nth(0).setInputFiles({
     name: 'v040-smoke.png',
     mimeType: 'image/png',
@@ -65,7 +86,6 @@ test('imports, processes, edits, and keeps both canvas viewports aligned', async
   })
   await expect(page.getByText(/图片已导入/)).toBeVisible()
 
-  const sourceCanvas = page.locator('canvas.source-canvas')
   await sourceCanvas.scrollIntoViewIfNeeded()
   const sourceBox = await sourceCanvas.boundingBox()
   expect(sourceBox).not.toBeNull()
@@ -103,6 +123,26 @@ test('imports, processes, edits, and keeps both canvas viewports aligned', async
 
   const pixelSurface = page.locator('.pixel-surface')
   await expect(pixelSurface).toHaveCount(1)
+  const pixelGrid = page.locator('.pixel-grid')
+  await expect(pixelGrid).toBeVisible()
+  const gridRendering = await pixelGrid.evaluate((element) => {
+    const style = getComputedStyle(element)
+    const image = element.previousElementSibling as HTMLCanvasElement
+    return {
+      backgroundSize: style.backgroundSize,
+      renderedCellSize: element.getBoundingClientRect().width / image.width,
+    }
+  })
+  const gridCellSizes = gridRendering.backgroundSize.split(', ').map((size) => Number.parseFloat(size))
+  expect(gridCellSizes).toHaveLength(2)
+  expect(gridCellSizes[0]).toBeCloseTo(gridRendering.renderedCellSize, 5)
+  expect(gridCellSizes[1]).toBeCloseTo(gridRendering.renderedCellSize, 5)
+  expect(gridRendering.renderedCellSize).toBeGreaterThanOrEqual(3)
+  const gridToggle = page.locator('.preview-shell').getByLabel('显示网格')
+  await gridToggle.uncheck()
+  await expect(pixelGrid).toHaveCount(0)
+  await gridToggle.check()
+  await expect(pixelGrid).toBeVisible()
   const initialTransform = await pixelSurface.getAttribute('style')
   const pixelViewport = page.locator('.pixel-viewport')
   const mainStage = page.locator('.main-stage')
