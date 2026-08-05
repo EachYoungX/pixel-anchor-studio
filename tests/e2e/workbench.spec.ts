@@ -264,6 +264,38 @@ test('imports, processes, edits, and keeps both canvas viewports aligned', async
   expect(pageErrors).toEqual([])
 })
 
+test('keeps the pixel result viewport visible in a narrow browser', async ({ page }) => {
+  await page.setViewportSize({ width: 470, height: 738 })
+  await page.goto('/')
+  await page.locator('input[type="file"]').nth(0).setInputFiles({
+    name: 'v042-narrow.png',
+    mimeType: 'image/png',
+    buffer: createSmokePng(48, 32),
+  })
+  await page.getByRole('button', { name: '生成预览' }).click()
+  await expect(page.getByText(/已生成 32 × 21/)).toBeVisible()
+
+  const layout = await page.evaluate(() => {
+    const viewport = document.querySelector<HTMLElement>('.pixel-viewport')
+    const canvas = document.querySelector<HTMLCanvasElement>('.pixel-canvas')
+    const resultPage = document.querySelector<HTMLElement>('.stage-page--result')
+    const settingsPanel = document.querySelector<HTMLElement>('.panel-left')
+    if (!viewport || !canvas || !resultPage || !settingsPanel) return null
+    return {
+      viewport: viewport.getBoundingClientRect().toJSON(),
+      canvas: canvas.getBoundingClientRect().toJSON(),
+      resultPage: resultPage.getBoundingClientRect().toJSON(),
+      settingsPanel: settingsPanel.getBoundingClientRect().toJSON(),
+    }
+  })
+
+  expect(layout).not.toBeNull()
+  expect(layout!.viewport.height).toBeGreaterThan(200)
+  expect(layout!.canvas.top).toBeGreaterThanOrEqual(layout!.viewport.top)
+  expect(layout!.canvas.bottom).toBeLessThanOrEqual(layout!.viewport.bottom)
+  expect(layout!.resultPage.bottom).toBeLessThanOrEqual(layout!.settingsPanel.top)
+})
+
 test('keeps document scrolling and completes crop, project, and bead export flows', async ({ page }) => {
   const pageErrors: string[] = []
   page.on('pageerror', (error) => pageErrors.push(error.message))

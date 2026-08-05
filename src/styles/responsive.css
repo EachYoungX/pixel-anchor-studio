@@ -20,6 +20,11 @@
   .app-shell { height: auto; min-height: 100vh; display: flex; flex-direction: column; }
   .workspace, .workspace--bead { display: flex; flex-direction: column; overflow: visible; }
   .panel-left, .panel-right { max-height: none; }
-  .main-stage { overflow: visible; order: -1; }
+  .main-stage { height: auto; overflow: visible; order: -1; }
+  .stage-page--source,
+  .stage-page--result {
+    flex: 0 0 auto;
+    min-height: clamp(420px, 72vh, 640px);
+  }
   .status-bar { align-items: flex-start; flex-direction: column; }
 }
