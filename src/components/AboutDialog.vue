@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue'
 import BrandLogo from '@/components/BrandLogo.vue'
-import { latestReleaseNotes } from '@/content/release-notes'
+import { latestRelease } from '@/content/release-notes'
+import licenseText from '../../LICENSE?raw'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ close: [] }>()
@@ -49,10 +50,34 @@ watch(() => props.open, (open) => { if (open) focusDialog() })
           <p>拼豆文档按视口中心缩放并通过普通滚动阅读</p>
           <p>双击空白区域或点击“恢复视图”适应窗口</p>
         </section>
-        <section v-else-if="activeTab === 'release'" class="about-section"><h3>最近更新</h3><ul><li v-for="note in latestReleaseNotes" :key="note">{{ note }}</li></ul><a href="https://github.com/EachYoungX/pixel-anchor-studio/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer">查看完整更新日志</a></section>
-        <section v-else class="about-section"><h3>项目与许可</h3><p>图片处理全部在当前浏览器中完成，不会上传到服务器。</p><a href="https://github.com/EachYoungX/pixel-anchor-studio" target="_blank" rel="noreferrer">打开 GitHub 项目</a><a href="https://github.com/EachYoungX/pixel-anchor-studio/blob/main/LICENSE" target="_blank" rel="noreferrer">查看 MIT License</a></section>
+        <section v-else-if="activeTab === 'release'" class="about-section">
+          <h3>最近更新</h3>
+          <template v-if="latestRelease">
+            <p class="release-meta">v{{ latestRelease.version }}<span v-if="latestRelease.date"> · {{ latestRelease.date }}</span></p>
+            <div v-for="section in latestRelease.sections" :key="section.title" class="release-section">
+              <h4>{{ section.title }}</h4>
+              <ul><li v-for="item in section.items" :key="item">{{ item }}</li></ul>
+            </div>
+          </template>
+          <p v-else>暂无可显示的更新记录。</p>
+          <a href="https://github.com/EachYoungX/pixel-anchor-studio/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer">查看完整更新日志</a>
+        </section>
+        <section v-else class="about-section project-license">
+          <h3>项目声明</h3>
+          <p>锚点像素工作台是一款在浏览器本地运行的图片像素化与拼豆文档工具。项目不要求注册账号，不提供云端存储，也不会主动将导入图片、像素结果或项目文件上传到服务器。</p>
+          <h3>隐私说明</h3>
+          <p>图片解码、像素处理、项目保存和文档导出均在当前浏览器中完成。除非用户自行下载或分享导出文件，工具不会主动传输这些内容。</p>
+          <h3>使用与责任</h3>
+          <p>用户应确保有权使用导入的图片，并自行确认生成结果的发布、商业使用与第三方素材许可。工具仅提供图像转换和文档生成能力，不对输入内容及其后续使用承担审查责任。</p>
+          <p>项目按照开源许可证按现状提供，不保证适用于所有图片、浏览器、打印设备或拼豆品牌色板。重要项目应自行保存原图、项目文件和导出结果。</p>
+          <h3>许可证全文</h3>
+          <pre class="license-text">{{ licenseText }}</pre>
+        </section>
       </div>
-      <footer class="about-footer"><a class="button button-primary" href="https://github.com/EachYoungX/pixel-anchor-studio" target="_blank" rel="noreferrer">打开 GitHub 项目</a></footer>
+      <footer class="about-footer">
+        <button class="button" type="button" @click="emit('close')">关闭</button>
+        <a class="button button-primary" href="https://github.com/EachYoungX/pixel-anchor-studio" target="_blank" rel="noreferrer">打开 GitHub 项目</a>
+      </footer>
     </section>
   </div>
 </template>
@@ -70,9 +95,15 @@ watch(() => props.open, (open) => { if (open) focusDialog() })
 .about-content { min-height: 0; overflow: auto; padding: 22px 24px; }
 .about-section { display: grid; gap: 14px; font-size: 14px; }
 .about-section h3 { font-size: 15px; }
+.about-section h4 { margin: 0; font-size: 14px; }
 .about-section p, .about-section li { font-size: 14px; line-height: 1.7; }
 .about-section a { color: var(--accent); font-size: 13px; }
 .about-section ol, .about-section ul { margin: 0; padding-left: 22px; }
 kbd { padding: 2px 5px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface-muted); font-size: 12px; }
-.about-footer { display: flex; justify-content: flex-end; padding: 14px 24px 18px; border-top: 1px solid var(--border); }
+.release-meta { color: var(--text); font-weight: 650; }
+.release-section { display: grid; gap: 8px; }
+.project-license { align-content: start; }
+.license-text { max-height: 260px; overflow: auto; margin: 0; padding: 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-muted); color: #343a40; font: 12px/1.65 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; }
+.about-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 24px 18px; border-top: 1px solid var(--border); }
+.about-footer .button-primary { min-height: 38px; padding: 8px 16px; font-size: 14px; font-weight: 650; }
 </style>

@@ -1,5 +1,4 @@
-export const latestReleaseNotes = [
-  '原图与结果之间取消滚动吸附，像素结果入口持续可见。',
-  '拼豆文档改为居中阅读，支持单页适应、适应宽度和中心缩放。',
-  '新导入图片默认输出长边为 32，并增加像素结果网格显示开关。',
-]
+import changelogText from '../../CHANGELOG.md?raw'
+import { parseLatestRelease } from '@/content/changelog-parser'
+
+export const latestRelease = parseLatestRelease(changelogText)
