@@ -4,6 +4,8 @@ import { useProjectStore } from '@/stores/project'
 import { useViewportController } from '@/composables/useViewportController'
 import { useCanvasGestures } from '@/composables/useCanvasGestures'
 import { useRafDraw } from '@/composables/useRafDraw'
+import { calculateOutputDimensions } from '@/core/dimensions'
+import { clampSourceRect, snapSourceRect } from '@/domain/source/crop-service'
 import type { Rect } from '@/types/project'
 
 const store = useProjectStore()
@@ -35,8 +37,12 @@ interface DragState {
 let view: ViewTransform = { scale: 1, offsetX: 0, offsetY: 0 }
 const viewport = useViewportController({ initialZoom: 1, minZoom: 0.25, maxZoom: 16 })
 let drag: DragState | null = null
+const draftRect = ref<Rect | null>(null)
 
 const activeRect = computed(() => (store.editTarget === 'anchor' ? store.anchor : store.effectiveCrop))
+const displayedRect = computed(() => draftRect.value ?? activeRect.value)
+const displayedCrop = computed(() => store.editTarget === 'crop' && draftRect.value ? draftRect.value : store.effectiveCrop)
+const displayedAnchor = computed(() => store.editTarget === 'anchor' && draftRect.value ? draftRect.value : store.anchor)
 
 function baseFitScale(): number {
   if (!store.source) return 1
@@ -59,7 +65,7 @@ function resizeCanvas(): void {
   canvas.value.style.width = `${width}px`
   canvas.value.style.height = `${height}px`
   if (viewport.mode.value === 'fit') viewport.resetView()
-  draw()
+  scheduleDraw()
 }
 
 function calculateView(): ViewTransform {
@@ -86,10 +92,10 @@ function toScreen(rect: Rect): Rect {
   }
 }
 
-function drawGrid(context: CanvasRenderingContext2D): void {
+function drawGrid(context: CanvasRenderingContext2D, cropRect: Rect): void {
   if (!showGrid.value || !store.source) return
-  const crop = toScreen(store.effectiveCrop)
-  const output = store.outputDimensions
+  const crop = toScreen(cropRect)
+  const output = calculateOutputDimensions(cropRect, displayedAnchor.value, store.scale)
   const geometry = output.geometry
   const stepX = Math.max(1, Math.ceil(output.width / 64))
   const stepY = Math.max(1, Math.ceil(output.height / 64))
@@ -179,15 +185,18 @@ function draw(): void {
   }
 
   view = calculateView()
+  const preview = store.sourcePreview
+  const displayWidth = store.source.width * view.scale
+  const displaySource = preview && displayWidth <= preview.width * 1.5 ? preview.image : store.sourceImage
   context.drawImage(
-    store.sourceImage,
+    displaySource,
     view.offsetX,
     view.offsetY,
     store.source.width * view.scale,
     store.source.height * view.scale,
   )
 
-  const cropScreen = toScreen(store.effectiveCrop)
+  const cropScreen = toScreen(displayedCrop.value)
   context.save()
   context.fillStyle = 'rgba(20, 24, 28, 0.48)'
   context.beginPath()
@@ -196,10 +205,10 @@ function draw(): void {
   context.fill('evenodd')
   context.restore()
 
-  drawGrid(context)
-  drawRect(context, store.effectiveCrop, store.editTarget === 'crop', '裁剪区域', '#34495E')
+  drawGrid(context, displayedCrop.value)
+  drawRect(context, displayedCrop.value, store.editTarget === 'crop', '裁剪区域', '#34495E')
   if (store.scale.mode === 'anchor') {
-    drawRect(context, store.anchor, store.editTarget === 'anchor', '特征锚点', '#8B4A43')
+    drawRect(context, displayedAnchor.value, store.editTarget === 'anchor', '特征锚点', '#8B4A43')
   }
 }
 
@@ -245,6 +254,7 @@ function onPrimaryPointerDown(event: PointerEvent): void {
     snapOriginX: store.effectiveCrop.x,
     snapOriginY: store.effectiveCrop.y,
   }
+  draftRect.value = current
   canvas.value.setPointerCapture(event.pointerId)
 }
 
@@ -295,14 +305,34 @@ function onPointerMove(event: PointerEvent): void {
     next.width = Math.max(drag.snapStepX, Math.round(next.width / drag.snapStepX) * drag.snapStepX)
     next.height = Math.max(drag.snapStepY, Math.round(next.height / drag.snapStepY) * drag.snapStepY)
   }
-  if (store.editTarget === 'anchor') store.updateAnchor(next)
-  else store.updateCrop(next)
+  if (store.source) {
+    if (store.editTarget === 'anchor') {
+      const side = Math.max(4, Math.min(next.width, next.height))
+      const square = { ...next, width: side, height: side }
+      draftRect.value = clampSourceRect(store.scale.snapMode === 'source-pixel' ? snapSourceRect(square) : square, store.source.width, store.source.height, 4)
+    } else {
+      draftRect.value = clampSourceRect(store.scale.snapMode === 'source-pixel' ? snapSourceRect(next) : next, store.source.width, store.source.height, 8)
+    }
+  }
   scheduleDraw()
 }
 
 function onPointerUp(event: PointerEvent): void {
-  if (canvas.value?.hasPointerCapture(event.pointerId)) canvas.value.releasePointerCapture(event.pointerId)
+  const committed = draftRect.value
+  if (committed) {
+    if (store.editTarget === 'anchor') store.updateAnchor(committed)
+    else store.updateCrop(committed)
+  }
+  draftRect.value = null
   drag = null
+  if (canvas.value?.hasPointerCapture(event.pointerId)) canvas.value.releasePointerCapture(event.pointerId)
+  scheduleDraw()
+}
+
+function onPointerCaptureLost(): void {
+  draftRect.value = null
+  drag = null
+  scheduleDraw()
 }
 
 const gestures = useCanvasGestures({
@@ -315,9 +345,11 @@ const gestures = useCanvasGestures({
       ? { x: point.x - (canvasCssSize.width - store.source.width * fitScale) / 2, y: point.y - (canvasCssSize.height - store.source.height * fitScale) / 2 }
       : point
   },
+  onZoomWheel: (event, point) => viewport.zoomAtPoint(point.x, point.y, Math.exp(-event.deltaY * 0.002)),
   onPrimaryPointerDown,
   onPrimaryPointerMove: onPointerMove,
   onPrimaryPointerUp: onPointerUp,
+  onPointerCaptureLost,
 })
 
 const { scheduleDraw } = useRafDraw(draw)
@@ -379,6 +411,7 @@ onBeforeUnmount(() => {
       @pointercancel="gestures.onPointerCancel"
       @pointerenter="gestures.onPointerEnter"
       @pointerleave="gestures.onPointerLeave"
+      @lostpointercapture="gestures.onLostPointerCapture"
       @wheel="gestures.onWheel"
       @dblclick="resetViewport"
       tabindex="0"

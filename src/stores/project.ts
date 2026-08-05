@@ -8,6 +8,7 @@ import { ProcessingService } from '@/domain/processing/processing-service'
 import { SourceSession } from '@/domain/source/source-session'
 import { imageToImageData } from '@/core/image/load'
 import type { SourceRuntime } from '@/domain/source/source-types'
+import type { SourcePreview } from '@/runtime/source-preview'
 import { createPaletteSnapshot, replacePaletteColor } from '@/domain/palette/palette-service'
 import { serializeProject } from '@/domain/project/serialization'
 import { centerSquareRect, clampSourceRect, fullSourceRect, snapSourceRect } from '@/domain/source/crop-service'
@@ -36,6 +37,7 @@ import type {
 export const useProjectStore = defineStore('project', () => {
   const source = ref<SourceRuntime | null>(null)
   const sourceImage = ref<HTMLImageElement | null>(null)
+  const sourcePreview = ref<SourcePreview | null>(null)
   const crop = reactive<Rect>({ x: 0, y: 0, width: 1, height: 1 })
   const cropSettings = reactive({ mode: 'custom' as CropMode, customRect: crop })
   const anchor = reactive<Rect>({ x: 0, y: 0, width: 32, height: 32 })
@@ -76,6 +78,7 @@ export const useProjectStore = defineStore('project', () => {
     sourceId.value = `source-${sourceRevision}`
     source.value = null
     sourceImage.value = null
+    sourcePreview.value = null
     result.value = null
     palette.value = []
     colorCodes.value = {}
@@ -118,6 +121,7 @@ export const useProjectStore = defineStore('project', () => {
     const loaded = await sourceSession.openFile(file)
     source.value = loaded.source
     sourceImage.value = markRaw(loaded.image)
+    sourcePreview.value = markRaw(loaded.preview)
     Object.assign(crop, { x: 0, y: 0, width: loaded.source.width, height: loaded.source.height })
     cropSettings.mode = 'custom'
     const anchorSide = Math.max(8, Math.min(loaded.source.width, loaded.source.height) * 0.12)
@@ -393,9 +397,11 @@ export const useProjectStore = defineStore('project', () => {
       const loaded = await sourceSession.openBlob({ name: project.source.name, mime: project.source.mime, width: project.source.width, height: project.source.height, blob })
       source.value = loaded.source
       sourceImage.value = markRaw(loaded.image)
+      sourcePreview.value = markRaw(loaded.preview)
     } else {
       source.value = null
       sourceImage.value = null
+      sourcePreview.value = null
     }
     Object.assign(crop, project.cropSettings.customRect)
     cropSettings.mode = project.cropSettings.mode
@@ -420,6 +426,7 @@ export const useProjectStore = defineStore('project', () => {
   return {
     source,
     sourceImage,
+    sourcePreview,
     crop,
     anchor,
     scale,

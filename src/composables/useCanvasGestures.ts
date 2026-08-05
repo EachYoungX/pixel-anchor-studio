@@ -1,16 +1,18 @@
 import { computed, onBeforeUnmount, onMounted, ref, type Ref } from 'vue'
 import type { Point } from '@/core/viewport/viewport-math'
-import { shouldCaptureZoomWheel, wheelDirection } from '@/core/viewport/gesture-policy'
+import { shouldCaptureZoomWheel } from '@/core/viewport/gesture-policy'
 import type { ViewportController } from '@/composables/useViewportController'
 
 export interface CanvasGestureOptions {
   element: Ref<HTMLElement | null>
   viewport: ViewportController
   getLocalPoint: (event: PointerEvent | WheelEvent) => Point
+  onZoomWheel: (event: WheelEvent, point: Point) => void
   canStartPan?: (event: PointerEvent) => boolean
   onPrimaryPointerDown?: (event: PointerEvent, point: Point) => void
   onPrimaryPointerMove?: (event: PointerEvent, point: Point) => void
   onPrimaryPointerUp?: (event: PointerEvent, point: Point) => void
+  onPointerCaptureLost?: () => void
 }
 
 export function useCanvasGestures(options: CanvasGestureOptions) {
@@ -35,7 +37,11 @@ export function useCanvasGestures(options: CanvasGestureOptions) {
 
   function onPointerLeave(): void {
     pointerInside.value = false
-    if (panning.value) finishPan()
+  }
+
+  function onLostPointerCapture(): void {
+    panning.value = false
+    options.onPointerCaptureLost?.()
   }
 
   function onPointerDown(event: PointerEvent): void {
@@ -79,7 +85,7 @@ export function useCanvasGestures(options: CanvasGestureOptions) {
     if (!shouldCaptureZoomWheel(event)) return
     event.preventDefault()
     const point = options.getLocalPoint(event)
-    options.viewport.zoomByStep(point.x, point.y, wheelDirection(event.deltaY))
+    options.onZoomWheel(event, point)
   }
 
   function onKeyDown(event: KeyboardEvent): void {
@@ -120,6 +126,7 @@ export function useCanvasGestures(options: CanvasGestureOptions) {
     onPointerMove,
     onPointerUp,
     onPointerCancel,
+    onLostPointerCapture,
     onWheel,
     finishPan,
   }

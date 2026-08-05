@@ -6,6 +6,7 @@ import { useViewportController } from '@/composables/useViewportController'
 import { useCanvasGestures } from '@/composables/useCanvasGestures'
 import { useRafDraw } from '@/composables/useRafDraw'
 import { screenToContent } from '@/core/viewport/viewport-math'
+import { wheelDirection } from '@/core/viewport/gesture-policy'
 
 const store = useProjectStore()
 const editorShell = ref<HTMLDivElement | null>(null)
@@ -153,11 +154,11 @@ function handlePrimaryPointerMove(event: PointerEvent): void {
 }
 
 function handlePrimaryPointerUp(event: PointerEvent): void {
-  if (viewport.value?.hasPointerCapture(event.pointerId)) viewport.value.releasePointerCapture(event.pointerId)
   if (transactionOpen.value) store.endPixelEdit()
   transactionOpen.value = false
   painting.value = false
   lastPixel = ''
+  if (viewport.value?.hasPointerCapture(event.pointerId)) viewport.value.releasePointerCapture(event.pointerId)
   scheduleDraw()
 }
 
@@ -165,9 +166,17 @@ const gestures = useCanvasGestures({
   element: viewport,
   viewport: viewportController,
   getLocalPoint,
+  onZoomWheel: (_event, point) => viewportController.zoomByStep(point.x, point.y, wheelDirection(_event.deltaY)),
   onPrimaryPointerDown: handlePrimaryPointerDown,
   onPrimaryPointerMove: handlePrimaryPointerMove,
   onPrimaryPointerUp: handlePrimaryPointerUp,
+  onPointerCaptureLost: () => {
+    if (transactionOpen.value) store.cancelPixelEdit()
+    transactionOpen.value = false
+    painting.value = false
+    lastPixel = ''
+    scheduleDraw()
+  },
 })
 
 function handleDoubleClick(event: MouseEvent): void {
@@ -230,6 +239,7 @@ onMounted(() => {
       @pointercancel="gestures.onPointerCancel"
       @pointerenter="gestures.onPointerEnter"
       @pointerleave="gestures.onPointerLeave"
+      @lostpointercapture="gestures.onLostPointerCapture"
       @wheel="gestures.onWheel"
       @dblclick="handleDoubleClick"
     >
