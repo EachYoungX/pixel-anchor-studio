@@ -10,7 +10,9 @@ import { imageToImageData } from '@/core/image/load'
 import type { SourceRuntime } from '@/domain/source/source-types'
 import { createPaletteSnapshot, replacePaletteColor } from '@/domain/palette/palette-service'
 import { serializeProject } from '@/domain/project/serialization'
+import { centerSquareRect, clampSourceRect, fullSourceRect, snapSourceRect } from '@/domain/source/crop-service'
 import { floodFillRgba, pixelMatchesRgba, readPixelHex, setPixelRgba, type DirtyBounds } from '@/domain/editor/pixel-operations'
+import { clonePixelResult } from '@/domain/editor/history'
 import { EditorSession } from '@/domain/editor/editor-session'
 import { defaultBead, defaultProcessing, defaultScale } from '@/domain/project/defaults'
 import type {
@@ -30,28 +32,6 @@ import type {
   ScaleMode,
   SnapSettings,
 } from '@/types/project'
-
-function clampRect(rect: Rect, width: number, height: number, minimum = 4): Rect {
-  const result = { ...rect }
-  result.width = Math.max(minimum, Math.min(width, result.width))
-  result.height = Math.max(minimum, Math.min(height, result.height))
-  result.x = Math.max(0, Math.min(width - result.width, result.x))
-  result.y = Math.max(0, Math.min(height - result.height, result.y))
-  return result
-}
-
-function snapRectToSourcePixels(rect: Rect): Rect {
-  return {
-    x: Math.round(rect.x),
-    y: Math.round(rect.y),
-    width: Math.max(1, Math.round(rect.width)),
-    height: Math.max(1, Math.round(rect.height)),
-  }
-}
-
-function cloneResult(result: PixelResult): PixelResult {
-  return { width: result.width, height: result.height, data: new Uint8ClampedArray(result.data) }
-}
 
 export const useProjectStore = defineStore('project', () => {
   const source = ref<SourceRuntime | null>(null)
@@ -107,11 +87,8 @@ export const useProjectStore = defineStore('project', () => {
 
   const effectiveCrop = computed<Rect>(() => {
     if (!source.value) return crop
-    if (cropSettings.mode === 'full') return { x: 0, y: 0, width: source.value.width, height: source.value.height }
-    if (cropSettings.mode === 'center-square') {
-      const side = Math.min(source.value.width, source.value.height)
-      return { x: (source.value.width - side) / 2, y: (source.value.height - side) / 2, width: side, height: side }
-    }
+    if (cropSettings.mode === 'full') return fullSourceRect(source.value.width, source.value.height)
+    if (cropSettings.mode === 'center-square') return centerSquareRect(source.value.width, source.value.height)
     return crop
   })
   const outputDimensions = computed(() => calculateOutputDimensions(effectiveCrop.value, anchor, scale))
@@ -162,8 +139,8 @@ export const useProjectStore = defineStore('project', () => {
 
   function updateCrop(next: Rect): void {
     if (!source.value) return
-    const snapped = scale.snapMode === 'source-pixel' ? snapRectToSourcePixels(next) : next
-    Object.assign(crop, clampRect(snapped, source.value.width, source.value.height, 8))
+    const snapped = scale.snapMode === 'source-pixel' ? snapSourceRect(next) : next
+    Object.assign(crop, clampSourceRect(snapped, source.value.width, source.value.height, 8))
     cropSettings.mode = 'custom'
   }
 
@@ -171,8 +148,8 @@ export const useProjectStore = defineStore('project', () => {
     if (!source.value) return
     const square = Math.max(4, Math.min(next.width, next.height))
     const nextAnchor = { ...next, width: square, height: square }
-    const snapped = scale.snapMode === 'source-pixel' ? snapRectToSourcePixels(nextAnchor) : nextAnchor
-    Object.assign(anchor, clampRect(snapped, source.value.width, source.value.height, 4))
+    const snapped = scale.snapMode === 'source-pixel' ? snapSourceRect(nextAnchor) : nextAnchor
+    Object.assign(anchor, clampSourceRect(snapped, source.value.width, source.value.height, 4))
   }
 
   function useCustomCrop(): void {
@@ -254,7 +231,7 @@ export const useProjectStore = defineStore('project', () => {
 
   function pushHistory(label: string): void {
     if (!result.value) return
-    history.value.push({ label, result: cloneResult(result.value) })
+    history.value.push({ label, result: clonePixelResult(result.value) })
     if (history.value.length > 20) history.value.shift()
     future.value = []
   }
@@ -369,7 +346,7 @@ export const useProjectStore = defineStore('project', () => {
   function undo(): void {
     if (!result.value || history.value.length === 0) return
     const previous = history.value.pop()!
-    future.value.push({ label: previous.label, result: cloneResult(result.value) })
+    future.value.push({ label: previous.label, result: clonePixelResult(result.value) })
     result.value = markRaw(previous.result)
     invalidateGeneratedResult('manual-edit')
     refreshPalette()
@@ -378,7 +355,7 @@ export const useProjectStore = defineStore('project', () => {
   function redo(): void {
     if (!result.value || future.value.length === 0) return
     const next = future.value.pop()!
-    history.value.push({ label: next.label, result: cloneResult(result.value) })
+    history.value.push({ label: next.label, result: clonePixelResult(result.value) })
     result.value = markRaw(next.result)
     invalidateGeneratedResult('manual-edit')
     refreshPalette()
