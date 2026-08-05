@@ -125,12 +125,12 @@ export const useProjectStore = defineStore('project', () => {
     Object.assign(crop, { x: 0, y: 0, width: loaded.source.width, height: loaded.source.height })
     cropSettings.mode = 'custom'
     const anchorSide = Math.max(8, Math.min(loaded.source.width, loaded.source.height) * 0.12)
-    Object.assign(anchor, {
+    Object.assign(anchor, normalizeSourceAnchor({
       x: Math.max(0, loaded.source.width * 0.5 - anchorSide / 2),
       y: Math.max(0, loaded.source.height * 0.35 - anchorSide / 2),
       width: anchorSide,
       height: anchorSide,
-    })
+    }, loaded.source.width, loaded.source.height))
     result.value = null
     invalidateGeneratedResult('source')
     palette.value = []
