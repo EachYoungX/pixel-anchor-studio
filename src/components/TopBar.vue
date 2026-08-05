@@ -104,8 +104,4 @@ async function savePng(scale: number): Promise<void> {
 .top-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
 .separator { width: 1px; margin: 4px 3px; background: var(--border); }
 .hidden-input { display: none; }
-@media (max-width: 960px) {
-  .top-bar { align-items: flex-start; flex-direction: column; }
-  .top-actions { justify-content: flex-start; }
-}
 </style>

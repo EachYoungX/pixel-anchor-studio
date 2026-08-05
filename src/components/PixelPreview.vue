@@ -276,7 +276,4 @@ onMounted(() => {
 .color-picker-label { display: flex; align-items: center; gap: 7px; color: #4f565e; font-size: 11px; }
 .color-picker { width: 30px; height: 26px; padding: 1px; border: 1px solid var(--border-strong); border-radius: 5px; background: #ffffff; }
 .color-picker-label code { color: #4b5158; font-size: 11px; }
-@media (max-width: 980px) {
-  .viewport-toolbar__actions { width: 100%; justify-content: flex-end; }
-}
 </style>

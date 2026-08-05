@@ -93,14 +93,18 @@ export function cleanupSmallRegions(
       output[sourceOffset + 3],
     ] as const
 
-    const replacement = [...boundary.values()].sort((a, b) => {
-      const contactDifference = b.count - a.count
-      if (contactDifference !== 0) return contactDifference
-      return (
-        colorDistanceSquared(source[0], source[1], source[2], a.rgba[0], a.rgba[1], a.rgba[2]) -
-        colorDistanceSquared(source[0], source[1], source[2], b.rgba[0], b.rgba[1], b.rgba[2])
-      )
-    })[0].rgba
+    let replacement: [number, number, number, number] | null = null
+    let bestContact = -1
+    let bestDistance = Infinity
+    for (const candidate of boundary.values()) {
+      const distance = colorDistanceSquared(source[0], source[1], source[2], candidate.rgba[0], candidate.rgba[1], candidate.rgba[2])
+      if (candidate.count > bestContact || (candidate.count === bestContact && distance < bestDistance)) {
+        replacement = candidate.rgba
+        bestContact = candidate.count
+        bestDistance = distance
+      }
+    }
+    if (!replacement) continue
 
     for (let componentIndex = 0; componentIndex < componentLength; componentIndex += 1) {
       const index = component[componentIndex]

@@ -385,17 +385,25 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   async function serialize(): Promise<SerializedProject> {
-    return serializeProject({
-      source: source.value,
-      crop: { ...toRaw(crop) },
-      cropSettings: { mode: cropSettings.mode, customRect: { ...toRaw(crop) } },
-      anchor: { ...toRaw(anchor) },
-      scale: { ...toRaw(scale), snapSettings: { ...scale.snapSettings } },
-      processing: { ...toRaw(processing) },
-      bead: { ...toRaw(bead) },
-      result: result.value,
-      colorCodes: colorCodes.value,
-    })
+    status.value = '正在整理项目文件并写入原图……'
+    try {
+      const document = await serializeProject({
+        source: source.value,
+        crop: { ...toRaw(crop) },
+        cropSettings: { mode: cropSettings.mode, customRect: { ...toRaw(crop) } },
+        anchor: { ...toRaw(anchor) },
+        scale: { ...toRaw(scale), snapSettings: { ...scale.snapSettings } },
+        processing: { ...toRaw(processing) },
+        bead: { ...toRaw(bead) },
+        result: result.value,
+        colorCodes: colorCodes.value,
+      })
+      status.value = '项目文件已整理完成'
+      return document
+    } catch (error) {
+      status.value = '项目文件整理失败，当前项目未受影响'
+      throw error
+    }
   }
 
   async function loadSerialized(project: SerializedProject): Promise<void> {
