@@ -297,3 +297,73 @@ test('keeps document scrolling and completes crop, project, and bead export flow
 
   expect(pageErrors).toEqual([])
 })
+
+test('keeps source drag capture outside the canvas and commits crop drafts on release', async ({ page }) => {
+  await page.goto('/')
+  await page.locator('input[type="file"]').nth(0).setInputFiles({
+    name: 'v041-drag.png',
+    mimeType: 'image/png',
+    buffer: createSmokePng(48, 32),
+  })
+  await expect(page.getByText(/图片已导入/)).toBeVisible()
+
+  const sourceCanvas = page.locator('canvas.source-canvas')
+  await sourceCanvas.scrollIntoViewIfNeeded()
+  await sourceCanvas.screenshot()
+  const sourceBox = await sourceCanvas.boundingBox()
+  expect(sourceBox).not.toBeNull()
+  const outputBadge = page.getByText('32 × 21', { exact: true })
+  const beforeOutput = await outputBadge.innerText()
+  const fitScale = Math.min((sourceBox!.width - 48) / 48, (sourceBox!.height - 48) / 32)
+  const handle = {
+    x: sourceBox!.x + (sourceBox!.width - 48 * fitScale) / 2 + 48 * fitScale,
+    y: sourceBox!.y + (sourceBox!.height - 32 * fitScale) / 2 + 32 * fitScale,
+  }
+  const beforeDraftFrame = await sourceCanvas.screenshot()
+
+  await page.mouse.move(handle.x - 2, handle.y - 2)
+  await page.mouse.down()
+  await page.mouse.move(handle.x - 200, handle.y - 8)
+  await page.waitForTimeout(32)
+  const draftFrame = await sourceCanvas.screenshot()
+  expect(draftFrame.equals(beforeDraftFrame)).toBe(false)
+  expect(await outputBadge.innerText()).toBe(beforeOutput)
+  await page.mouse.up()
+  await expect.poll(async () => (await sourceCanvas.screenshot()).equals(draftFrame)).toBe(true)
+
+  await page.locator('.source-canvas-host').getByRole('button', { name: '恢复视图' }).click()
+  const panStart = { x: sourceBox!.x + sourceBox!.width / 2, y: sourceBox!.y + sourceBox!.height / 2 }
+  await page.keyboard.down('Space')
+  await page.mouse.move(panStart.x, panStart.y)
+  await page.mouse.down()
+  await page.mouse.move(sourceBox!.x + sourceBox!.width + 20, panStart.y)
+  await page.waitForTimeout(32)
+  const firstOutsideFrame = await sourceCanvas.screenshot()
+  await page.mouse.move(sourceBox!.x + sourceBox!.width + 90, panStart.y + 20)
+  await page.waitForTimeout(32)
+  const secondOutsideFrame = await sourceCanvas.screenshot()
+  await page.mouse.up()
+  await page.keyboard.up('Space')
+  expect(secondOutsideFrame.equals(firstOutsideFrame)).toBe(false)
+})
+
+test('shows repository-backed release notes and the complete project license', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: '锚点像素工作台 图片像素化与拼豆图工具' }).click()
+  const dialog = page.getByRole('dialog', { name: '锚点像素工作台' })
+  await expect(dialog).toBeVisible()
+
+  await dialog.getByRole('button', { name: '更新日志' }).click()
+  await expect(dialog.getByText('v0.4.1')).toBeVisible()
+  await expect(dialog.getByRole('heading', { name: '操作' })).toBeVisible()
+
+  await dialog.getByRole('button', { name: '项目与许可' }).click()
+  await expect(dialog.getByRole('heading', { name: '项目声明' })).toBeVisible()
+  await expect(dialog.getByRole('heading', { name: '隐私说明' })).toBeVisible()
+  await expect(dialog.locator('.license-text')).toContainText('Copyright (c) 2026 Pixel Anchor Studio contributors')
+  await expect(dialog.getByRole('link', { name: '打开 GitHub 项目' })).toHaveCount(1)
+  const githubFontSize = await dialog.getByRole('link', { name: '打开 GitHub 项目' }).evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize))
+  expect(githubFontSize).toBeGreaterThanOrEqual(14)
+  await dialog.locator('.about-footer').getByRole('button', { name: '关闭' }).click()
+  await expect(dialog).toBeHidden()
+})
