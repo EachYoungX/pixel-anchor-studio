@@ -126,17 +126,26 @@ test('imports, processes, edits, and keeps both canvas viewports aligned', async
   const pixelGrid = page.locator('.pixel-grid')
   await expect(pixelGrid).toBeVisible()
   const gridRendering = await pixelGrid.evaluate((element) => {
-    const style = getComputedStyle(element)
+    const path = element.querySelector('path')
     const image = element.previousElementSibling as HTMLCanvasElement
+    const dimensions = element.getAttribute('viewBox')?.split(' ').map(Number) ?? []
+    const pathData = path?.getAttribute('d') ?? ''
     return {
-      backgroundSize: style.backgroundSize,
+      dimensions,
+      pathData,
+      moveCount: pathData.match(/M/g)?.length ?? 0,
       renderedCellSize: element.getBoundingClientRect().width / image.width,
+      shapeRendering: path ? getComputedStyle(path).shapeRendering : '',
+      strokeWidth: path ? getComputedStyle(path).strokeWidth : '',
     }
   })
-  const gridCellSizes = gridRendering.backgroundSize.split(', ').map((size) => Number.parseFloat(size))
-  expect(gridCellSizes).toHaveLength(2)
-  expect(gridCellSizes[0]).toBeCloseTo(gridRendering.renderedCellSize, 5)
-  expect(gridCellSizes[1]).toBeCloseTo(gridRendering.renderedCellSize, 5)
+  expect(gridRendering.dimensions).toHaveLength(4)
+  expect(gridRendering.dimensions[2] / 32).toBeCloseTo(gridRendering.renderedCellSize, 5)
+  expect(gridRendering.moveCount).toBe(32 + 21 + 2)
+  expect(gridRendering.pathData).toContain(`V${gridRendering.dimensions[3]}`)
+  expect(gridRendering.pathData).toContain(`H${gridRendering.dimensions[2]}`)
+  expect(gridRendering.shapeRendering).toBe('crispedges')
+  expect(gridRendering.strokeWidth).toBe('1px')
   expect(gridRendering.renderedCellSize).toBeGreaterThanOrEqual(3)
   const gridToggle = page.locator('.preview-shell').getByLabel('显示网格')
   await gridToggle.uncheck()
@@ -161,6 +170,17 @@ test('imports, processes, edits, and keeps both canvas viewports aligned', async
   await page.mouse.wheel(0, -240)
   await page.keyboard.up('Control')
   await expect.poll(() => pixelSurface.getAttribute('style')).not.toBe(initialTransform)
+  const zoomedGridRendering = await pixelGrid.evaluate((element) => {
+    const path = element.querySelector('path')
+    return {
+      moveCount: path?.getAttribute('d')?.match(/M/g)?.length ?? 0,
+      strokeWidth: path ? getComputedStyle(path).strokeWidth : '',
+      vectorEffect: path ? getComputedStyle(path).vectorEffect : '',
+    }
+  })
+  expect(zoomedGridRendering.moveCount).toBe(32 + 21 + 2)
+  expect(zoomedGridRendering.strokeWidth).toBe('1px')
+  expect(zoomedGridRendering.vectorEffect).toBe('non-scaling-stroke')
 
   await page.keyboard.down('Space')
   await page.mouse.move(viewportBox!.x + 80, viewportBox!.y + 80)

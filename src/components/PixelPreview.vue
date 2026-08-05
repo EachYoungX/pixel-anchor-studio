@@ -36,15 +36,33 @@ const selectedColorForInput = computed({
   set: (value: string) => { store.selectedColor = value.toUpperCase() },
 })
 
+const surfaceDimensions = computed(() => ({
+  width: (store.result?.width ?? 0) * zoom.value,
+  height: (store.result?.height ?? 0) * zoom.value,
+}))
+
 const surfaceStyle = computed(() => ({
-  width: `${(store.result?.width ?? 0) * zoom.value}px`,
-  height: `${(store.result?.height ?? 0) * zoom.value}px`,
+  width: `${surfaceDimensions.value.width}px`,
+  height: `${surfaceDimensions.value.height}px`,
   transform: `translate(${viewportController.panX.value}px, ${viewportController.panY.value}px)`,
 }))
 
-const gridStyle = computed(() => ({
-  backgroundSize: `${zoom.value}px ${zoom.value}px`,
-}))
+const gridPath = computed(() => {
+  const result = store.result
+  if (!result) return ''
+  const width = surfaceDimensions.value.width
+  const height = surfaceDimensions.value.height
+  const commands: string[] = []
+  for (let x = 0; x <= result.width; x += 1) {
+    const position = x === result.width ? width - 0.5 : x * zoom.value + 0.5
+    commands.push(`M${position} 0V${height}`)
+  }
+  for (let y = 0; y <= result.height; y += 1) {
+    const position = y === result.height ? height - 0.5 : y * zoom.value + 0.5
+    commands.push(`M0 ${position}H${width}`)
+  }
+  return commands.join('')
+})
 
 function getLocalPoint(event: PointerEvent | WheelEvent): { x: number; y: number } {
   const bounds = viewport.value?.getBoundingClientRect()
@@ -217,7 +235,14 @@ onMounted(() => {
     >
       <div class="pixel-surface" :style="surfaceStyle">
         <canvas ref="imageCanvas" class="pixel-canvas" />
-        <div v-if="showGrid && zoom >= 3" class="pixel-grid" :style="gridStyle" aria-hidden="true" />
+        <svg
+          v-if="showGrid && zoom >= 3"
+          class="pixel-grid"
+          :viewBox="`0 0 ${surfaceDimensions.width} ${surfaceDimensions.height}`"
+          aria-hidden="true"
+        >
+          <path class="pixel-grid__lines" :d="gridPath" />
+        </svg>
       </div>
     </div>
   </div>
@@ -234,11 +259,18 @@ onMounted(() => {
 .pixel-grid {
   position: absolute;
   inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
-  background-image:
-    linear-gradient(to right, rgba(70, 75, 82, 0.28) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(70, 75, 82, 0.28) 1px, transparent 1px);
-  box-shadow: inset 0 0 0 1px rgba(70, 75, 82, 0.28);
+  overflow: hidden;
+}
+.pixel-grid__lines {
+  fill: none;
+  stroke: rgba(52, 58, 64, 0.42);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  shape-rendering: crispEdges;
 }
 .grid-toggle { display: flex; align-items: center; gap: 5px; color: #60676f; font-size: 12px; white-space: nowrap; }
 .color-picker-label { display: flex; align-items: center; gap: 7px; color: #4f565e; font-size: 11px; }
