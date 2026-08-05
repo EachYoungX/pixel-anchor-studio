@@ -31,5 +31,8 @@ describe('RgbaSourceBackend', () => {
       13, 14, 15, 255,
       16, 17, 18, 255,
     ])
+
+    backend.release('source-1')
+    expect(() => backend.readCrop('source-1', { x: 0, y: 0, width: 1, height: 1 })).toThrow('源图缓存不存在')
   })
 })

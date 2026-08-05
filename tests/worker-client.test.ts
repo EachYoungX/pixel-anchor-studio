@@ -30,6 +30,7 @@ class FakeWorker {
 
 const originalWorker = globalThis.Worker
 let lastWorker: FakeWorker | null = null
+let workers: FakeWorker[] = []
 
 function request(): ProcessRequest {
   return {
@@ -53,6 +54,7 @@ function installFakeWorker(onProcess: (worker: FakeWorker, message: FakeMessage)
         if (message.type === 'process') onProcess(worker, message)
       })
       lastWorker = this
+      workers.push(this)
     }
   } as unknown as typeof Worker
 }
@@ -61,17 +63,40 @@ afterEach(() => {
   clearProcessingWorker()
   globalThis.Worker = originalWorker
   lastWorker = null
+  workers = []
 })
 
 describe('worker client defensive handling', () => {
   it('rejects when a processing request times out', async () => {
     installFakeWorker(() => undefined)
     await expect(runProcessing(request(), 'source-test', 10)).rejects.toThrow('处理超时')
+    expect(lastWorker?.terminated).toBe(true)
   })
 
   it('rejects when the source load times out', async () => {
     installFakeWorker(() => undefined, false)
     await expect(runProcessing(request(), 'source-timeout', 10)).rejects.toThrow('加载原图超时')
+    expect(lastWorker?.terminated).toBe(true)
+  })
+
+  it('rebuilds the Worker after a timeout', async () => {
+    let attempts = 0
+    installFakeWorker((worker, message) => {
+      attempts += 1
+      if (attempts === 1) return
+      queueMicrotask(() => worker.onmessage?.({
+        data: { type: 'process-result', protocol: 1, requestId: message.requestId, result: { width: 1, height: 1, data: new Uint8ClampedArray([1, 2, 3, 255]) }, durationMs: 0 },
+      } as MessageEvent<FakeMessage>))
+    })
+    await expect(runProcessing(request(), 'source-rebuild', 10)).rejects.toThrow('处理超时')
+    await expect(runProcessing(request(), 'source-rebuild', 100)).resolves.toMatchObject({ result: { width: 1, height: 1 } })
+    expect(workers).toHaveLength(2)
+    expect(workers[0].terminated).toBe(true)
+  })
+
+  it('rejects synchronous postMessage failures', async () => {
+    installFakeWorker(() => { throw new Error('post failed') })
+    await expect(runProcessing(request())).rejects.toThrow('post failed')
   })
 
   it('rejects all pending work when the Worker crashes', async () => {

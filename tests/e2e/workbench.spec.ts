@@ -189,21 +189,57 @@ test('imports, processes, edits, and keeps both canvas viewports aligned', async
   await page.mouse.up()
   await page.keyboard.up('Space')
   await expect.poll(() => pixelSurface.getAttribute('style')).not.toBe(initialTransform)
-  await page.locator('.preview-shell').getByRole('button', { name: '恢复视图' }).click()
+
+  const beforePixelMiddlePan = await pixelSurface.getAttribute('style')
+  await page.mouse.move(viewportBox!.x + 90, viewportBox!.y + 90)
+  await page.mouse.down({ button: 'middle' })
+  await page.mouse.move(viewportBox!.x + 145, viewportBox!.y + 125)
+  await page.mouse.up({ button: 'middle' })
+  await expect.poll(() => pixelSurface.getAttribute('style')).not.toBe(beforePixelMiddlePan)
+
+  await page.keyboard.down('Space')
+  await page.mouse.move(viewportBox!.x + 100, viewportBox!.y + 100)
+  await page.mouse.down()
+  await page.mouse.move(viewportBox!.x + 130, viewportBox!.y + 120)
+  await page.evaluate(() => window.dispatchEvent(new Event('blur')))
+  const transformAfterBlur = await pixelSurface.getAttribute('style')
+  await page.mouse.move(viewportBox!.x + 190, viewportBox!.y + 160)
+  await expect.poll(() => pixelSurface.getAttribute('style')).toBe(transformAfterBlur)
+  await page.mouse.up()
+  await page.keyboard.up('Space')
+
+  await pixelViewport.dblclick({ position: { x: viewportBox!.width - 24, y: viewportBox!.height - 24 } })
   await expect.poll(() => pixelSurface.getAttribute('style')).toBe(initialTransform)
 
   await page.getByRole('button', { name: '画笔' }).click()
+  await page.locator('.color-picker').fill('#01fe02')
   const pixelCanvas = page.locator('canvas.pixel-canvas')
+  await page.keyboard.down('Control')
+  await page.mouse.move(viewportBox!.x + viewportBox!.width / 2, viewportBox!.y + viewportBox!.height / 2)
+  await page.mouse.wheel(0, -240)
+  await page.keyboard.up('Control')
+  await page.keyboard.down('Space')
+  await page.mouse.move(viewportBox!.x + 100, viewportBox!.y + 100)
+  await page.mouse.down()
+  await page.mouse.move(viewportBox!.x + 135, viewportBox!.y + 120)
+  await page.mouse.up()
+  await page.keyboard.up('Space')
   const pixelCanvasBox = await pixelCanvas.boundingBox()
   expect(pixelCanvasBox).not.toBeNull()
-  await page.mouse.move(pixelCanvasBox!.x + 12, pixelCanvasBox!.y + 12)
-  await page.mouse.down()
-  await page.mouse.move(pixelCanvasBox!.x + 60, pixelCanvasBox!.y + 30)
-  await page.mouse.move(pixelCanvasBox!.x + 110, pixelCanvasBox!.y + 50)
-  await page.mouse.up()
+  const targetPixel = { x: 5, y: 4 }
+  await pixelCanvas.click({ position: {
+    x: (targetPixel.x + 0.5) * pixelCanvasBox!.width / 32,
+    y: (targetPixel.y + 0.5) * pixelCanvasBox!.height / 21,
+  } })
+  await expect.poll(() => pixelCanvas.evaluate((canvas, target) => {
+    const context = (canvas as HTMLCanvasElement).getContext('2d')
+    return context ? [...context.getImageData(target.x, target.y, 1, 1).data] : []
+  }, targetPixel)).toEqual([1, 254, 2, 255])
   await expect(page.getByRole('button', { name: '撤销' })).toBeEnabled()
   await page.getByRole('button', { name: '撤销' }).click()
   await expect(page.getByRole('button', { name: '重做' })).toBeEnabled()
+
+  await page.locator('.preview-shell').getByRole('button', { name: '恢复视图' }).click()
 
   await page.getByRole('button', { name: '透明' }).click()
   await pixelCanvas.click({ position: { x: 8, y: 8 } })
