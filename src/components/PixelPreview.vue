@@ -7,6 +7,7 @@ import { useCanvasGestures } from '@/composables/useCanvasGestures'
 import { useRafDraw } from '@/composables/useRafDraw'
 import { screenToContent } from '@/core/viewport/viewport-math'
 import { wheelDirection } from '@/core/viewport/gesture-policy'
+import PixelExportPopover from '@/components/PixelExportPopover.vue'
 
 const store = useProjectStore()
 const editorShell = ref<HTMLDivElement | null>(null)
@@ -228,6 +229,7 @@ onMounted(() => {
       <div class="viewport-toolbar__actions">
         <button class="button button-small" type="button" @click="resetView">恢复视图</button>
         <label class="grid-toggle"><input v-model="showGrid" type="checkbox" /> 显示网格</label>
+        <PixelExportPopover />
       </div>
     </div>
     <div

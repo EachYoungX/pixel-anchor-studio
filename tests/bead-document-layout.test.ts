@@ -48,4 +48,15 @@ describe('createBeadDocumentLayout', () => {
     expect(quantities[0].x).toBe(72)
     expect(swatches[16].x - quantities[0].x).toBe(14)
   })
+
+  it('accepts centralized document text without changing layout commands', () => {
+    const layout = createBeadDocumentLayout(result, palette, settings)
+    const commands = buildLegendPageCommands(layout.pdfLegendPages[0], {
+      pattern: 'Pattern',
+      colorsAndUsage: 'Colors',
+      columns: 'Columns',
+      rows: 'Rows',
+    })
+    expect(commands[0]).toMatchObject({ type: 'text', text: expect.stringContaining('Colors') })
+  })
 })

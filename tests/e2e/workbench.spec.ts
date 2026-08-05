@@ -118,8 +118,17 @@ test('imports, processes, edits, and keeps both canvas viewports aligned', async
 
   await page.getByRole('button', { name: '生成预览' }).click()
   await expect(page.getByText(/已生成 32 × 21/)).toBeVisible()
-  await expect(page.getByRole('button', { name: 'PNG原尺寸' })).toBeEnabled()
+  await expect(page.locator('.top-actions').getByText(/PNG原尺寸|PNG八倍/)).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '导出PNG' })).toBeEnabled()
   await expect(page.getByRole('button', { name: '拼豆图导出' })).toBeEnabled()
+
+  await page.getByRole('button', { name: '导出PNG' }).click()
+  const pngDialog = page.getByRole('dialog', { name: '导出像素结果 PNG' })
+  await expect(pngDialog.getByText('256 × 168')).toBeVisible()
+  await pngDialog.getByLabel('PNG放大倍数').selectOption('custom')
+  await pngDialog.getByLabel('自定义PNG倍数').fill('16')
+  await expect(pngDialog.getByText('512 × 336')).toBeVisible()
+  await pngDialog.getByRole('button', { name: '取消' }).click()
 
   const pixelSurface = page.locator('.pixel-surface')
   await expect(pixelSurface).toHaveCount(1)
@@ -276,7 +285,9 @@ test('keeps document scrolling and completes crop, project, and bead export flow
   await expect(page.getByText(/已生成 32 × 32/)).toBeVisible()
 
   const savedDownloadPromise = page.waitForEvent('download')
-  await page.getByRole('button', { name: '保存项目' }).click()
+  await page.getByRole('button', { name: '项目' }).click()
+  await expect(page.getByRole('menuitem', { name: '打开项目' })).toBeVisible()
+  await page.getByRole('menuitem', { name: '保存项目' }).click()
   const savedDownload = await savedDownloadPromise
   expect(savedDownload.suggestedFilename()).toContain('.pixel-anchor.json')
   const savedProject = await readDownload(savedDownload)
