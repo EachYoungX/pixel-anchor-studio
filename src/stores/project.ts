@@ -366,7 +366,10 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   async function serialize(): Promise<SerializedProject> {
-    status.value = '正在整理项目文件并写入原图……'
+    const largeSource = source.value ? source.value.width * source.value.height * 4 >= 120 * 1024 * 1024 : false
+    status.value = largeSource
+      ? '正在整理大型项目文件并写入原图，可能需要较多内存和时间……'
+      : '正在整理项目文件并写入原图……'
     try {
       const document = await serializeProject({
         source: source.value,
