@@ -5,6 +5,7 @@ import { exportProjectFile, parseProjectFile } from '@/core/export/project'
 import { useProjectStore } from '@/stores/project'
 import BrandLogo from '@/components/BrandLogo.vue'
 import AboutDialog from '@/components/AboutDialog.vue'
+import { markQuickStartSeen, shouldShowQuickStart } from '@/core/onboarding'
 
 const store = useProjectStore()
 const imageInput = ref<HTMLInputElement | null>(null)
@@ -15,6 +16,7 @@ const projectMenuButton = ref<HTMLButtonElement | null>(null)
 const firstProjectMenuItem = ref<HTMLButtonElement | null>(null)
 const projectMenuOpen = ref(false)
 const aboutOpen = ref(false)
+let returnAboutFocusToBrand = false
 
 function closeProjectMenu(): void {
   projectMenuOpen.value = false
@@ -44,6 +46,7 @@ function handleDocumentKeydown(event: KeyboardEvent): void {
 onMounted(() => {
   document.addEventListener('pointerdown', handleDocumentPointerDown)
   document.addEventListener('keydown', handleDocumentKeydown)
+  if (shouldShowQuickStart(window.localStorage)) aboutOpen.value = true
 })
 
 onBeforeUnmount(() => {
@@ -53,7 +56,15 @@ onBeforeUnmount(() => {
 
 function closeAbout(): void {
   aboutOpen.value = false
-  nextTick(() => brandButton.value?.focus())
+  markQuickStartSeen(window.localStorage)
+  const shouldReturnFocus = returnAboutFocusToBrand
+  returnAboutFocusToBrand = false
+  if (shouldReturnFocus) nextTick(() => brandButton.value?.focus())
+}
+
+function openAbout(): void {
+  returnAboutFocusToBrand = true
+  aboutOpen.value = true
 }
 
 async function handleImage(event: Event): Promise<void> {
@@ -100,7 +111,7 @@ function openProjectPicker(): void {
   <header class="top-bar">
     <div class="brand">
       <BrandLogo />
-      <button ref="brandButton" class="brand-button" type="button" title="关于工具" @click="aboutOpen = true">
+      <button ref="brandButton" class="brand-button" type="button" title="打开快速开始与关于工具" @click="openAbout">
         <strong>锚点像素工作台</strong>
         <span>图片像素化与拼豆图工具</span>
       </button>

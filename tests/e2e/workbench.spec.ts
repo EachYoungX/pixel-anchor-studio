@@ -1,4 +1,4 @@
-import { expect, test, type Download } from '@playwright/test'
+import { expect, test, type Download, type Page } from '@playwright/test'
 import { deflateSync } from 'node:zlib'
 
 function crc32(bytes: Uint8Array): number {
@@ -53,10 +53,17 @@ async function readDownload(download: Download): Promise<Buffer> {
   return Buffer.concat(chunks)
 }
 
+async function openWorkbench(page: Page): Promise<void> {
+  await page.goto('/')
+  const dialog = page.getByRole('dialog', { name: '锚点像素工作台' })
+  await expect(dialog).toBeVisible()
+  await dialog.locator('.about-footer').getByRole('button', { name: '关闭' }).click()
+}
+
 test('imports, processes, edits, and keeps both canvas viewports aligned', async ({ page }) => {
   const pageErrors: string[] = []
   page.on('pageerror', (error) => pageErrors.push(error.message))
-  await page.goto('/')
+  await openWorkbench(page)
 
   const sourceCanvas = page.locator('canvas.source-canvas')
   const resultEmptyState = page.locator('.canvas-empty-state')
@@ -276,7 +283,7 @@ test('imports, processes, edits, and keeps both canvas viewports aligned', async
 
 test('keeps the pixel result viewport visible in a narrow browser', async ({ page }) => {
   await page.setViewportSize({ width: 470, height: 738 })
-  await page.goto('/')
+  await openWorkbench(page)
   await page.locator('input[type="file"]').nth(0).setInputFiles({
     name: 'v042-narrow.png',
     mimeType: 'image/png',
@@ -309,7 +316,7 @@ test('keeps the pixel result viewport visible in a narrow browser', async ({ pag
 test('keeps document scrolling and completes crop, project, and bead export flows', async ({ page }) => {
   const pageErrors: string[] = []
   page.on('pageerror', (error) => pageErrors.push(error.message))
-  await page.goto('/')
+  await openWorkbench(page)
   await page.locator('input[type="file"]').nth(0).setInputFiles({
     name: 'v040-roundtrip.png',
     mimeType: 'image/png',
@@ -397,7 +404,7 @@ test('keeps document scrolling and completes crop, project, and bead export flow
 })
 
 test('keeps source drag capture outside the canvas and commits crop drafts on release', async ({ page }) => {
-  await page.goto('/')
+  await openWorkbench(page)
   await page.locator('input[type="file"]').nth(0).setInputFiles({
     name: 'v041-drag.png',
     mimeType: 'image/png',
@@ -445,11 +452,22 @@ test('keeps source drag capture outside the canvas and commits crop drafts on re
   expect(secondOutsideFrame.equals(firstOutsideFrame)).toBe(false)
 })
 
-test('shows repository-backed release notes and the complete project license', async ({ page }) => {
+test('shows quick start once and reopens release notes and license from the title', async ({ page }) => {
   await page.goto('/')
-  await page.getByRole('button', { name: '锚点像素工作台 图片像素化与拼豆图工具' }).click()
   const dialog = page.getByRole('dialog', { name: '锚点像素工作台' })
   await expect(dialog).toBeVisible()
+  await expect(dialog.getByRole('button', { name: '快速开始' })).toBeVisible()
+  await expect(dialog.getByRole('heading', { name: '快速开始' })).toBeVisible()
+  await expect(dialog.getByRole('heading', { name: '常用操作' })).toBeVisible()
+  await expect(dialog.getByRole('heading', { name: '以后如何再次打开' })).toBeVisible()
+  await expect(dialog.getByText(/点击页面左上角的“锚点像素工作台”标题/)).toBeVisible()
+  await dialog.locator('.about-footer').getByRole('button', { name: '关闭' }).click()
+  await expect(dialog).toBeHidden()
+
+  await page.reload()
+  await expect(dialog).toBeHidden()
+  await page.getByRole('button', { name: '锚点像素工作台 图片像素化与拼豆图工具' }).click()
+  await expect(dialog.getByRole('heading', { name: '快速开始' })).toBeVisible()
 
   await dialog.getByRole('button', { name: '更新日志' }).click()
   await expect(dialog.getByText('v0.4.3')).toBeVisible()

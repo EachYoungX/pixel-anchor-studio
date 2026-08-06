@@ -22,7 +22,11 @@ function handleKeydown(event: KeyboardEvent): void {
   else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
 }
 
-watch(() => props.open, (open) => { if (open) focusDialog() })
+watch(() => props.open, (open) => {
+  if (!open) return
+  activeTab.value = 'usage'
+  focusDialog()
+})
 </script>
 
 <template>
@@ -34,14 +38,14 @@ watch(() => props.open, (open) => { if (open) focusDialog() })
         <button ref="closeButton" class="dialog-close" type="button" aria-label="关闭" @click="emit('close')">×</button>
       </header>
       <nav class="about-tabs" aria-label="关于工具内容">
-        <button class="about-tab" :class="{ active: activeTab === 'usage' }" type="button" @click="activeTab = 'usage'">使用方法</button>
+        <button class="about-tab" :class="{ active: activeTab === 'usage' }" type="button" @click="activeTab = 'usage'">快速开始</button>
         <button class="about-tab" :class="{ active: activeTab === 'release' }" type="button" @click="activeTab = 'release'">更新日志</button>
         <button class="about-tab" :class="{ active: activeTab === 'project' }" type="button" @click="activeTab = 'project'">项目与许可</button>
       </nav>
       <div class="about-content">
         <section v-if="activeTab === 'usage'" class="about-section">
           <h3>快速开始</h3>
-          <ol><li>导入图片并选择图像范围；</li><li>选择像素化方式，生成并编辑结果；</li><li>检查拼豆 PDF 分页或 SVG 总览；</li><li>从对应工作区导出文件。</li></ol>
+          <ol><li>导入图片并选择图像范围</li><li>选择像素化方式，生成并编辑结果</li><li>检查拼豆 PDF 分页或 SVG 总览</li><li>从对应工作区导出文件</li></ol>
           <h3>常用操作</h3>
           <p>位于原图与网格和像素结果区域：</p>
           <p>缩放：<kbd>Ctrl / Command</kbd> + <kbd>滚轮</kbd></p>
@@ -49,6 +53,9 @@ watch(() => props.open, (open) => { if (open) focusDialog() })
           <p>全局：<kbd>Ctrl / Command</kbd> + <kbd>Z</kbd> 撤销</p>
           <p>拼豆文档按视口中心缩放并通过普通滚动阅读</p>
           <p>双击空白区域或点击“恢复视图”适应窗口</p>
+          <div class="reopen-tip">
+            <p>关闭窗口后，点击页面左上角的“锚点像素工作台”标题，即可重新打开本窗口</p>
+          </div>
         </section>
         <section v-else-if="activeTab === 'release'" class="about-section">
           <h3>最近更新</h3>
@@ -99,6 +106,9 @@ watch(() => props.open, (open) => { if (open) focusDialog() })
 .about-section p, .about-section li { font-size: 14px; line-height: 1.7; }
 .about-section a { color: var(--accent); font-size: 13px; }
 .about-section ol, .about-section ul { margin: 0; padding-left: 22px; }
+.quick-start-intro { color: var(--text); }
+.reopen-tip { display: grid; gap: 8px; margin-top: 4px; padding: 14px; border: 1px solid #cbd5dd; border-radius: 8px; background: var(--accent-soft); }
+.reopen-tip p { color: #35495a; }
 kbd { padding: 2px 5px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface-muted); font-size: 12px; }
 .release-meta { color: var(--text); font-weight: 650; }
 .release-section { display: grid; gap: 8px; }
