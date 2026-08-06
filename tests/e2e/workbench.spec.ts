@@ -60,6 +60,72 @@ async function openWorkbench(page: Page): Promise<void> {
   await dialog.locator('.about-footer').getByRole('button', { name: '关闭' }).click()
 }
 
+interface BrowserDropFile {
+  name: string
+  mimeType: string
+  buffer: Buffer
+}
+
+async function dispatchFileDrag(page: Page, type: 'dragenter' | 'drop', files: BrowserDropFile[]): Promise<void> {
+  await page.evaluate(({ type, files }) => {
+    const transfer = new DataTransfer()
+    for (const descriptor of files) {
+      const binary = atob(descriptor.base64)
+      const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0))
+      transfer.items.add(new File([bytes], descriptor.name, { type: descriptor.mimeType }))
+    }
+    window.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: transfer }))
+  }, {
+    type,
+    files: files.map((file) => ({ name: file.name, mimeType: file.mimeType, base64: file.buffer.toString('base64') })),
+  })
+}
+
+test('shows passive drop feedback and applies safe multi-file import rules', async ({ page }) => {
+  const blockingDialogs: string[] = []
+  page.on('dialog', async (dialog) => {
+    blockingDialogs.push(dialog.message())
+    await dialog.dismiss()
+  })
+  await openWorkbench(page)
+  const firstImage = { name: 'first-drop.png', mimeType: 'image/png', buffer: createSmokePng(40, 24) }
+  const secondImage = { name: 'second-drop.png', mimeType: 'image/png', buffer: createSmokePng(20, 20) }
+
+  await dispatchFileDrag(page, 'dragenter', [firstImage])
+  const overlay = page.getByRole('status', { name: '拖放图片导入' })
+  await expect(overlay).toBeVisible()
+  await expect(overlay.getByText('图片拖放到此处即可导入')).toBeVisible()
+  await expect(overlay.getByText(/PNG、JPEG、WebP、GIF、AVIF、BMP、SVG/)).toBeVisible()
+  await expect(overlay.getByText(/文件仅在本地处理/)).toBeVisible()
+  await expect(overlay).toHaveCSS('pointer-events', 'none')
+
+  await dispatchFileDrag(page, 'drop', [firstImage, secondImage])
+  await expect(overlay).toBeHidden()
+  await expect(page.getByText('first-drop.png · 40 × 24', { exact: true })).toBeVisible()
+  await expect(page.getByText(/已忽略另外 1 个文件/)).toBeVisible()
+
+  await dispatchFileDrag(page, 'drop', [{ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('not an image') }])
+  const unsupportedNotice = page.getByRole('alert')
+  await expect(unsupportedNotice).toContainText('notes.txt')
+  await expect(unsupportedNotice).toContainText('文件类型不受支持')
+  await expect(unsupportedNotice).toContainText('支持类型')
+  await expect(page.getByText('first-drop.png · 40 × 24', { exact: true })).toBeVisible()
+
+  await dispatchFileDrag(page, 'drop', [{ name: 'broken-drop.png', mimeType: 'image/png', buffer: Buffer.from('not an image') }])
+  const failedImageNotice = page.getByRole('alert').filter({ hasText: 'broken-drop.png' })
+  await expect(failedImageNotice).toContainText('无法解码图片')
+  await expect(failedImageNotice).toContainText('当前项目未受影响')
+  await expect(page.getByText('first-drop.png · 40 × 24', { exact: true })).toBeVisible()
+  expect(blockingDialogs).toEqual([])
+
+  await dispatchFileDrag(page, 'drop', [
+    { name: 'mixed.pixel-anchor.json', mimeType: 'application/json', buffer: Buffer.from('{}') },
+    secondImage,
+  ])
+  await expect(page.getByRole('alert').filter({ hasText: 'mixed.pixel-anchor.json' })).toContainText('项目文件不能与图片或其他文件混合拖入')
+  await expect(page.getByText('first-drop.png · 40 × 24', { exact: true })).toBeVisible()
+})
+
 test('imports, processes, edits, and keeps both canvas viewports aligned', async ({ page }) => {
   const pageErrors: string[] = []
   page.on('pageerror', (error) => pageErrors.push(error.message))
@@ -459,8 +525,7 @@ test('shows quick start once and reopens release notes and license from the titl
   await expect(dialog.getByRole('button', { name: '快速开始' })).toBeVisible()
   await expect(dialog.getByRole('heading', { name: '快速开始' })).toBeVisible()
   await expect(dialog.getByRole('heading', { name: '常用操作' })).toBeVisible()
-  await expect(dialog.getByRole('heading', { name: '以后如何再次打开' })).toBeVisible()
-  await expect(dialog.getByText(/点击页面左上角的“锚点像素工作台”标题/)).toBeVisible()
+  await expect(dialog.getByText(/关闭窗口后，点击页面左上角的“锚点像素工作台”标题/)).toBeVisible()
   await dialog.locator('.about-footer').getByRole('button', { name: '关闭' }).click()
   await expect(dialog).toBeHidden()
 

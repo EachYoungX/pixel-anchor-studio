@@ -10,10 +10,17 @@ import BeadWorkspace from '@/components/bead/BeadWorkspace.vue'
 import BeadSettingsPanel from '@/components/bead/BeadSettingsPanel.vue'
 import type { WorkspaceMode } from '@/types/project'
 import { useGlobalShortcuts } from '@/composables/useGlobalShortcuts'
+import { useFileDropImport } from '@/composables/useFileDropImport'
+import { parseProjectFile } from '@/core/export/project'
+import DropImportOverlay from '@/components/DropImportOverlay.vue'
 
 const store = useProjectStore()
 const workspaceMode = ref<WorkspaceMode>('pixel')
 useGlobalShortcuts()
+const { dropActive, notice: importNotice, dismissNotice } = useFileDropImport({
+  importImage: (file) => store.importImage(file),
+  importProject: async (file) => store.loadSerialized(await parseProjectFile(file)),
+})
 </script>
 
 <template>
@@ -61,6 +68,23 @@ useGlobalShortcuts()
       <span>{{ store.status }}</span>
       <span v-if="store.lastDurationMs > 0">处理耗时 {{ store.lastDurationMs.toFixed(0) }} ms</span>
     </footer>
+    <DropImportOverlay :active="dropActive" />
+    <Transition name="import-notice">
+      <aside
+        v-if="importNotice"
+        :key="importNotice.id"
+        class="import-notice"
+        :class="`import-notice--${importNotice.tone}`"
+        :role="importNotice.tone === 'error' ? 'alert' : 'status'"
+        aria-live="polite"
+      >
+        <div>
+          <strong>{{ importNotice.title }}</strong>
+          <p>{{ importNotice.detail }}</p>
+        </div>
+        <button type="button" aria-label="关闭导入提示" @click="dismissNotice">×</button>
+      </aside>
+    </Transition>
   </div>
 </template>
 
@@ -68,4 +92,31 @@ useGlobalShortcuts()
 .workspace-tabs { min-height: 48px; display: flex; align-items: center; gap: 8px; padding: 6px 14px; background: #f5f6f7; }
 .workspace-tab { min-height: 38px; padding: 7px 16px; border: 1px solid var(--border-strong); border-radius: 8px; background: #fff; color: #30363c; font-size: 14px; font-weight: 600; }
 .workspace-tab.active { background: var(--accent-soft); border-color: #8e9ba7; color: var(--accent); }
+.import-notice {
+  position: fixed;
+  z-index: 1001;
+  right: 18px;
+  bottom: 48px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  width: min(440px, calc(100vw - 36px));
+  padding: 14px 14px 14px 16px;
+  border: 1px solid #b7c5d1;
+  border-left: 4px solid var(--accent);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 16px 40px rgba(20, 24, 28, 0.18);
+}
+.import-notice--error { border-color: #dfb7b7; border-left-color: var(--danger); background: #fffafa; }
+.import-notice > div { min-width: 0; display: grid; gap: 4px; }
+.import-notice strong { overflow-wrap: anywhere; font-size: 14px; }
+.import-notice p { overflow-wrap: anywhere; font-size: 12px; }
+.import-notice button { flex: none; width: 28px; height: 28px; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: 21px; line-height: 1; }
+.import-notice-enter-active, .import-notice-leave-active { transition: opacity 140ms ease, transform 140ms ease; }
+.import-notice-enter-from, .import-notice-leave-to { opacity: 0; transform: translateY(8px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .import-notice-enter-active, .import-notice-leave-active { transition: none; }
+}
 </style>
