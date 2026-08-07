@@ -29,6 +29,20 @@ describe('desktop installer configuration', () => {
     expect(preinstall.indexOf('PAS_DETECT_WEBVIEW2')).toBeLessThan(preinstall.indexOf('PAS_CREATE_OWNER_MARKER'))
   })
 
+  it('uses controlled install browsing and preserves explicit data modes', () => {
+    const template = readWorkspaceFile('src-tauri/nsis/installer.nsi')
+    const hooks = readWorkspaceFile('src-tauri/nsis/installer-hooks.nsh')
+
+    expect(template).toContain('Page custom PasInstallPageCreate PasInstallPageLeave')
+    expect(template).not.toContain('!insertmacro MUI_PAGE_DIRECTORY')
+    expect(hooks).toContain('Call PasFindExistingDirectory')
+    expect(hooks).toContain('nsDialogs::SelectFolderDialog "选择安装根目录" "$0"')
+    expect(hooks).toContain('Var PasDataMode')
+    expect(hooks).toContain('StrCpy $PasDataMode "install"')
+    expect(hooks).toContain('StrCpy $PasDataDirectory "$INSTDIR\\data"')
+    expect(hooks).toContain('Call PasRefreshDataDirectory')
+  })
+
   it('uses safe shortcut and uninstall defaults', () => {
     const template = readWorkspaceFile('src-tauri/nsis/installer.nsi')
     const hooks = readWorkspaceFile('src-tauri/nsis/installer-hooks.nsh')

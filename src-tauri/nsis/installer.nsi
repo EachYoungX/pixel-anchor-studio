@@ -390,9 +390,8 @@ Function PageLeaveReinstall
   reinst_done:
 FunctionEnd
 
-; 5. Choose install directory page
-!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
-!insertmacro MUI_PAGE_DIRECTORY
+; 5. Pixel Anchor Studio controlled install directory page
+Page custom PasInstallPageCreate PasInstallPageLeave
 
 ; 6. Pixel Anchor Studio data, shortcut, dependency, and confirmation pages
 Page custom PasDataPageCreate PasDataPageLeave

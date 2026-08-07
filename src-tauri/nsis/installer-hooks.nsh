@@ -10,10 +10,13 @@
 
 Var PasDataDirectory
 Var PasInstallId
+Var PasInstallInput
+Var PasInstallBrowseButton
 Var PasDataInput
 Var PasDataBrowseButton
 Var PasDataDefaultButton
 Var PasDataInstallButton
+Var PasDataMode
 Var PasStartMenuCheckbox
 Var PasDesktopCheckbox
 Var PasStartMenuEnabled
@@ -31,15 +34,127 @@ Var PasWebViewStatusLabel
   ${EndIf}
 !macroend
 
+Function PasFindExistingDirectory
+  Exch $0
+  ${If} $0 == ""
+    StrCpy $0 "$LOCALAPPDATA\Programs"
+  ${EndIf}
+  pas_find_existing_directory:
+    ${If} ${FileExists} "$0\*.*"
+      Goto pas_existing_directory_found
+    ${EndIf}
+    ${GetParent} "$0" $1
+    ${If} $1 == ""
+    ${OrIf} $1 == $0
+      StrCpy $0 "$LOCALAPPDATA\Programs"
+      Goto pas_existing_directory_found
+    ${EndIf}
+    StrCpy $0 $1
+    Goto pas_find_existing_directory
+  pas_existing_directory_found:
+  Exch $0
+FunctionEnd
+
+Function PasNormalizeInstallDirectory
+  Exch $0
+  GetFullPathName $0 "$0"
+  ${GetFileName} "$0" $1
+  ${StrCase} $1 "$1" "L"
+  ${If} $1 != "pixelanchorstudio"
+    StrCpy $0 "$0\PixelAnchorStudio"
+  ${EndIf}
+  Exch $0
+FunctionEnd
+
+Function PasInstallPageCreate
+  ${If} $PassiveMode = 1
+    Abort
+  ${EndIf}
+  nsDialogs::Create 1018
+  Pop $0
+  ${If} $0 == error
+    Abort
+  ${EndIf}
+  !insertmacro MUI_HEADER_TEXT "安装位置" "选择锚点像素工作台的程序文件位置"
+  ${NSD_CreateLabel} 0 0 100% 24u "安装目录可以直接输入、复制或粘贴；应用文件夹名固定为 PixelAnchorStudio。"
+  Pop $0
+  ${NSD_CreateText} 0 34u 78% 13u "$INSTDIR"
+  Pop $PasInstallInput
+  ${NSD_CreateButton} 80% 33u 20% 15u "浏览..."
+  Pop $PasInstallBrowseButton
+  ${NSD_OnClick} $PasInstallBrowseButton PasBrowseInstall
+  ${NSD_CreateLabel} 0 62u 100% 30u "再次浏览会从当前目录开始；若当前目录尚未创建，则从最近存在的父目录开始。"
+  Pop $0
+  nsDialogs::Show
+FunctionEnd
+
+Function PasBrowseInstall
+  ${NSD_GetText} $PasInstallInput $0
+  Push $0
+  Call PasFindExistingDirectory
+  Pop $0
+  nsDialogs::SelectFolderDialog "选择安装根目录" "$0"
+  Pop $0
+  ${If} $0 != error
+  ${AndIf} $0 != ""
+    Push $0
+    Call PasNormalizeInstallDirectory
+    Pop $INSTDIR
+    ${NSD_SetText} $PasInstallInput "$INSTDIR"
+  ${EndIf}
+FunctionEnd
+
+Function PasInstallPageLeave
+  ${NSD_GetText} $PasInstallInput $0
+  ${If} $0 == ""
+    MessageBox MB_ICONEXCLAMATION "请选择安装位置。"
+    Abort
+  ${EndIf}
+  Push $0
+  Call PasNormalizeInstallDirectory
+  Pop $0
+  ${If} ${FileExists} "$0"
+  ${AndIfNot} ${FileExists} "$0\*.*"
+    MessageBox MB_ICONEXCLAMATION "安装位置指向了文件，请选择或输入目录。"
+    Abort
+  ${EndIf}
+  StrCpy $INSTDIR $0
+  ${NSD_SetText} $PasInstallInput "$INSTDIR"
+FunctionEnd
+
+Function PasRefreshDataDirectory
+  ${If} $PasDataMode == "default"
+    StrCpy $PasDataDirectory "$LOCALAPPDATA\PixelAnchorStudio\data"
+  ${ElseIf} $PasDataMode == "install"
+    StrCpy $PasDataDirectory "$INSTDIR\data"
+  ${EndIf}
+FunctionEnd
+
 Function PasDataPageCreate
   ${If} $PassiveMode = 1
     Abort
   ${EndIf}
-  ReadRegStr $PasDataDirectory HKCU "${PAS_REGKEY}" "DataDirectory"
-  ReadRegStr $PasInstallId HKCU "${PAS_REGKEY}" "InstallId"
-  ${If} $PasDataDirectory == ""
-    StrCpy $PasDataDirectory "$LOCALAPPDATA\PixelAnchorStudio\data"
+  ${If} $PasInstallId == ""
+    ReadRegStr $PasInstallId HKCU "${PAS_REGKEY}" "InstallId"
   ${EndIf}
+  ${If} $PasDataMode == ""
+    ReadRegStr $PasDataDirectory HKCU "${PAS_REGKEY}" "DataDirectory"
+    ${If} $PasDataDirectory == ""
+      StrCpy $PasDataMode "default"
+    ${Else}
+      ${StrCase} $0 "$PasDataDirectory" "L"
+      ${StrCase} $1 "$LOCALAPPDATA\PixelAnchorStudio\data" "L"
+      ${StrCase} $2 "$INSTDIR\data" "L"
+      ${If} $0 == $1
+        StrCpy $PasDataMode "default"
+      ${ElseIf} $0 == $2
+        StrCpy $PasDataMode "install"
+      ${Else}
+        StrCpy $PasDataMode "custom"
+      ${EndIf}
+    ${EndIf}
+  ${EndIf}
+  Call PasRefreshDataDirectory
 
   nsDialogs::Create 1018
   Pop $0
@@ -66,12 +181,14 @@ Function PasDataPageCreate
 FunctionEnd
 
 Function PasUseDefaultData
-  StrCpy $PasDataDirectory "$LOCALAPPDATA\PixelAnchorStudio\data"
+  StrCpy $PasDataMode "default"
+  Call PasRefreshDataDirectory
   ${NSD_SetText} $PasDataInput "$PasDataDirectory"
 FunctionEnd
 
 Function PasUseInstallData
-  StrCpy $PasDataDirectory "$INSTDIR\data"
+  StrCpy $PasDataMode "install"
+  Call PasRefreshDataDirectory
   ${NSD_SetText} $PasDataInput "$PasDataDirectory"
 FunctionEnd
 
@@ -134,6 +251,7 @@ Function PasBrowseData
     Push $0
     Call PasNormalizeDataRoot
     Pop $PasDataDirectory
+    StrCpy $PasDataMode "custom"
     ${NSD_SetText} $PasDataInput "$PasDataDirectory"
   ${EndIf}
 FunctionEnd
@@ -148,6 +266,16 @@ Function PasDataPageLeave
   ${AndIfNot} ${FileExists} "$PasDataDirectory\*.*"
     MessageBox MB_ICONEXCLAMATION "应用数据位置指向了文件，请选择或输入目录。"
     Abort
+  ${EndIf}
+  ${StrCase} $0 "$PasDataDirectory" "L"
+  ${StrCase} $1 "$LOCALAPPDATA\PixelAnchorStudio\data" "L"
+  ${StrCase} $2 "$INSTDIR\data" "L"
+  ${If} $0 == $1
+    StrCpy $PasDataMode "default"
+  ${ElseIf} $0 == $2
+    StrCpy $PasDataMode "install"
+  ${Else}
+    StrCpy $PasDataMode "custom"
   ${EndIf}
   Push $PasDataDirectory
   Call PasFindExistingParent
