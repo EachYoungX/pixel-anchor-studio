@@ -27,6 +27,38 @@ function download(data: Uint8Array, filename: string, mime = 'application/octet-
   URL.revokeObjectURL(url)
 }
 
+interface BrowserSaveFileHandle {
+  createWritable(): Promise<{ write(data: Blob): Promise<void>; close(): Promise<void> }>
+}
+
+type SavePickerWindow = Window & {
+  showSaveFilePicker?: (options: {
+    suggestedName: string
+    types: Array<{ description: string; accept: Record<string, string[]> }>
+  }) => Promise<BrowserSaveFileHandle>
+}
+
+async function saveWithBrowserPicker(data: Uint8Array, options: SaveBinaryOptions, mime: string): Promise<SaveResult | null> {
+  const showSaveFilePicker = (window as SavePickerWindow).showSaveFilePicker
+  if (!showSaveFilePicker) return null
+  try {
+    const handle = await showSaveFilePicker.call(window, {
+      suggestedName: options.suggestedName,
+      types: [{
+        description: options.description,
+        accept: { [mime.split(';')[0]]: options.extensions.map((extension) => `.${extension}`) },
+      }],
+    })
+    const writable = await handle.createWritable()
+    await writable.write(new Blob([new Uint8Array(data)], { type: mime }))
+    await writable.close()
+    return { status: 'saved' }
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') return { status: 'cancelled' }
+    throw error
+  }
+}
+
 export class WebPlatformService implements PlatformService {
   readonly kind = 'web' as const
 
@@ -56,6 +88,10 @@ export class WebPlatformService implements PlatformService {
         : extension === 'pdf' ? 'application/pdf'
           : extension === 'csv' ? 'text/csv;charset=utf-8'
             : 'application/octet-stream'
+    if (extension === 'png') {
+      const pickerResult = await saveWithBrowserPicker(data, options, mime)
+      if (pickerResult) return pickerResult
+    }
     download(data, options.suggestedName, mime)
     return { status: 'saved' }
   }

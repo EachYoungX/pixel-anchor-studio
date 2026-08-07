@@ -1,4 +1,5 @@
 import { saveBlob } from '@/core/export/download'
+import { isPngExportSizeAllowed, MAX_PNG_EDGE, normalizePngScale } from '@/core/export/png-scale'
 import type { PixelResult } from '@/types/project'
 
 function resultToCanvas(result: PixelResult, scale: number): HTMLCanvasElement {
@@ -21,7 +22,11 @@ function resultToCanvas(result: PixelResult, scale: number): HTMLCanvasElement {
 }
 
 export async function exportPng(result: PixelResult, filename: string, scale: number): Promise<boolean> {
-  const canvas = resultToCanvas(result, Math.max(1, Math.floor(scale)))
+  const normalizedScale = normalizePngScale(scale)
+  if (!isPngExportSizeAllowed(result.width, result.height, normalizedScale)) {
+    throw new Error(`PNG 导出长边不能超过 ${MAX_PNG_EDGE} 像素`)
+  }
+  const canvas = resultToCanvas(result, normalizedScale)
   const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((value) => (value ? resolve(value) : reject(new Error('PNG生成失败'))), 'image/png')
   })

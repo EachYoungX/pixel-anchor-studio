@@ -2,6 +2,7 @@
 import { computed, nextTick, ref } from 'vue'
 import { sanitizeFilename } from '@/core/export/download'
 import { exportPng } from '@/core/export/png'
+import { isPngExportSizeAllowed, MAX_PNG_EDGE, MAX_PNG_SCALE, normalizePngScale, pngExportDimensions } from '@/core/export/png-scale'
 import { useProjectStore } from '@/stores/project'
 
 const store = useProjectStore()
@@ -12,10 +13,19 @@ const exporting = ref(false)
 const trigger = ref<HTMLButtonElement | null>(null)
 
 const scale = computed(() => preset.value === 'custom'
-  ? Math.max(1, Math.min(16, Math.round(Number(customScale.value) || 1)))
+  ? normalizePngScale(customScale.value)
   : Number(preset.value))
-const finalWidth = computed(() => (store.result?.width ?? 0) * scale.value)
-const finalHeight = computed(() => (store.result?.height ?? 0) * scale.value)
+const customScaleAllowed = computed(() => preset.value !== 'custom'
+  || (Number.isInteger(Number(customScale.value)) && Number(customScale.value) >= 1 && Number(customScale.value) <= MAX_PNG_SCALE))
+const finalDimensions = computed(() => pngExportDimensions(store.result?.width ?? 0, store.result?.height ?? 0, scale.value))
+const finalWidth = computed(() => finalDimensions.value.width)
+const finalHeight = computed(() => finalDimensions.value.height)
+const sizeAllowed = computed(() => customScaleAllowed.value && store.result
+  ? isPngExportSizeAllowed(store.result.width, store.result.height, scale.value)
+  : false)
+const validationMessage = computed(() => !customScaleAllowed.value
+  ? `请输入 1–${MAX_PNG_SCALE} 之间的整数倍。`
+  : `导出图片长边不能超过 ${MAX_PNG_EDGE} 像素，请降低放大倍数。`)
 const filename = computed(() => {
   const base = sanitizeFilename(store.source?.name ?? 'pixel-art')
   const result = store.result
@@ -33,7 +43,7 @@ function close(): void {
 }
 
 async function save(): Promise<void> {
-  if (!store.result || exporting.value) return
+  if (!store.result || exporting.value || !sizeAllowed.value) return
   exporting.value = true
   try {
     if (await exportPng(store.result, filename.value, scale.value)) {
@@ -51,7 +61,7 @@ async function save(): Promise<void> {
 <template>
   <button ref="trigger" class="button button-small" type="button" :disabled="!store.result" @click="show">导出PNG</button>
   <Teleport to="body">
-    <div v-if="open" class="pixel-export-backdrop" role="presentation" @click.self="close" @keydown.esc="close">
+    <div v-if="open" class="pixel-export-backdrop" role="presentation">
       <section class="pixel-export-dialog" role="dialog" aria-modal="true" aria-labelledby="pixel-export-title">
         <header class="pixel-export-header">
           <div><h2 id="pixel-export-title">导出像素结果 PNG</h2><p>使用最近邻整数倍放大，保留透明通道。</p></div>
@@ -69,15 +79,17 @@ async function save(): Promise<void> {
             </select>
           </label>
           <label v-if="preset === 'custom'" class="field">
-            <span class="field-label">自定义整数倍（1–16）</span>
-            <input v-model.number="customScale" aria-label="自定义PNG倍数" type="number" min="1" max="16" step="1" />
+            <span class="field-label">自定义整数倍（1–{{ MAX_PNG_SCALE }}）</span>
+            <input v-model.number="customScale" aria-label="自定义PNG倍数" type="number" min="1" :max="MAX_PNG_SCALE" step="1" />
           </label>
           <div class="export-summary"><span>最终尺寸</span><strong>{{ finalWidth }} × {{ finalHeight }}</strong></div>
+          <p v-if="!sizeAllowed" class="export-limit" role="alert">{{ validationMessage }}</p>
           <div class="export-summary export-filename"><span>文件名</span><code>{{ filename }}</code></div>
+          <div class="export-summary"><span>保存位置</span><strong>导出时选择</strong></div>
         </div>
         <footer class="pixel-export-footer">
           <button class="button" type="button" @click="close">取消</button>
-          <button class="button button-primary" type="button" :disabled="exporting" @click="save">{{ exporting ? '正在导出…' : '导出PNG' }}</button>
+          <button class="button button-primary" type="button" :disabled="exporting || !sizeAllowed" @click="save">{{ exporting ? '正在导出…' : '导出PNG' }}</button>
         </footer>
       </section>
     </div>
@@ -94,6 +106,7 @@ async function save(): Promise<void> {
 .pixel-export-body { display: grid; gap: 16px; padding: 20px 22px; }
 .export-summary { display: flex; justify-content: space-between; gap: 16px; padding: 11px 12px; border-radius: 7px; background: var(--surface-muted); color: var(--text-muted); font-size: 13px; }
 .export-summary strong { color: var(--text); }
+.export-limit { margin: -6px 2px 0; color: var(--danger); font-size: 12px; }
 .export-filename { align-items: flex-start; flex-direction: column; }
 .export-filename code { max-width: 100%; overflow-wrap: anywhere; color: var(--text); }
 .pixel-export-footer { display: flex; justify-content: flex-end; gap: 9px; padding: 14px 22px 18px; border-top: 1px solid var(--border); }

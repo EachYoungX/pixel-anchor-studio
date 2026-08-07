@@ -242,15 +242,35 @@ test('imports, processes, edits, and keeps both canvas viewports aligned', async
   await page.getByRole('button', { name: '导出PNG' }).click()
   const pngDialog = page.getByRole('dialog', { name: '导出像素结果 PNG' })
   await expect(pngDialog.getByText('256 × 168')).toBeVisible()
+  await page.locator('.pixel-export-backdrop').click({ position: { x: 5, y: 5 } })
+  await expect(pngDialog).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(pngDialog).toBeVisible()
   await pngDialog.getByLabel('PNG放大倍数').selectOption('custom')
-  await pngDialog.getByLabel('自定义PNG倍数').fill('16')
-  await expect(pngDialog.getByText('512 × 336')).toBeVisible()
+  await pngDialog.getByLabel('自定义PNG倍数').fill('33')
+  await expect(pngDialog.getByText('请输入 1–32 之间的整数倍。')).toBeVisible()
+  await expect(pngDialog.getByRole('button', { name: '导出PNG' })).toBeDisabled()
+  await pngDialog.getByLabel('自定义PNG倍数').fill('32')
+  await expect(pngDialog.getByText('1024 × 672')).toBeVisible()
+  await expect(pngDialog.getByText('导出时选择')).toBeVisible()
   await pngDialog.getByLabel('PNG放大倍数').selectOption('2')
   await expect(pngDialog.getByText('64 × 42')).toBeVisible()
-  const pngDownloadPromise = page.waitForEvent('download')
+  await page.evaluate(() => {
+    Object.defineProperty(window, 'showSaveFilePicker', {
+      configurable: true,
+      value: async (options: { suggestedName: string }) => ({
+        createWritable: async () => ({
+          write: async (blob: Blob) => { (window as typeof window & { savedPng?: { name: string; size: number } }).savedPng = { name: options.suggestedName, size: blob.size } },
+          close: async () => undefined,
+        }),
+      }),
+    })
+  })
   await pngDialog.getByRole('button', { name: '导出PNG' }).click()
-  const pngDownload = await pngDownloadPromise
-  expect(pngDownload.suggestedFilename()).toMatch(/-32x21-2x\.png$/)
+  await expect(pngDialog).toBeHidden()
+  const savedPng = await page.evaluate(() => (window as typeof window & { savedPng?: { name: string; size: number } }).savedPng)
+  expect(savedPng?.name).toMatch(/-32x21-2x\.png$/)
+  expect(savedPng?.size).toBeGreaterThan(0)
 
   const pixelSurface = page.locator('.pixel-surface')
   await expect(pixelSurface).toHaveCount(1)
