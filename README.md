@@ -1,10 +1,34 @@
 # 锚点像素工作台
 
-一个在浏览器本地运行的图片像素化与拼豆图工具。
+一个在本地运行的图片像素化与拼豆图工具，同时提供网页版本与 Windows x64 桌面版本。
 
 它可以处理风景、物品、动物、人像、二次元图片和 AI 生成的伪像素图。普通图片可以直接指定输出大小；需要保留局部细节时，可以用特征锚点确定像素尺度；已经具有像素块结构的图片，则可以使用伪像素对齐进行重新整理。
 
-图片处理全部在当前浏览器中完成，不会上传到服务器。
+图片处理全部在当前设备中完成，不会上传到服务器。
+
+## Windows 桌面版
+
+v0.5.0 提供两种 Windows 10/11 x64 发行形式：
+
+- **便携版**：完整解压后直接运行，应用设置、WebView 数据、缓存和恢复数据均位于便携目录的 `data` 文件夹；移动整个目录即可迁移；
+- **安装版**：按当前用户安装，可修改安装位置和应用数据位置，并创建开始菜单及桌面快捷方式。
+
+桌面版不需要 Node.js、npm、Rust、Vite、本地服务器或独立浏览器。它使用系统 Microsoft Edge WebView2 Runtime；系统缺少该组件时，程序会在创建窗口前说明并提供微软官方安装入口。WebView2 已安装时，图片处理、项目读写和全部导出功能均可断网使用。
+
+桌面版通过系统文件对话框打开图片和项目，并保存项目、PNG、SVG、PDF 与 CSV。项目和导出文件不会默认保存到安装目录或内部数据目录。`Ctrl+I` 导入图片、`Ctrl+O` 打开项目、`Ctrl+S` 保存、`Ctrl+Shift+S` 另存为。
+
+### SmartScreen 与校验
+
+首个桌面测试版本可能尚未进行 Windows 代码签名，因此 SmartScreen 可能显示“Windows 已保护你的电脑”。请只从本项目官方 GitHub Release 下载，并先核对 Release 提供的 `SHA256SUMS.txt`。确认来源和 SHA-256 完全一致后，可点击“更多信息”，再点击“仍要运行”。不建议关闭 SmartScreen，也不要从第三方网站下载安装包。
+
+PowerShell 校验示例：
+
+```powershell
+Get-FileHash .\PixelAnchorStudio-0.5.0-Setup.exe -Algorithm SHA256
+Get-FileHash .\PixelAnchorStudio-0.5.0-Portable.zip -Algorithm SHA256
+```
+
+便携版删除整个解压目录时，也会删除该目录中的设置、缓存以及用户自行放入的项目或导出文件；删除前请先移动需要保留的文件。安装版卸载器只删除应用清单中的文件和经过所有权标记确认的内部数据，安装目录或自定义数据目录中的未知文件会保留并提示。
 
 ## 能做什么
 
@@ -59,6 +83,19 @@ npm run dev
 ```bash
 npm run build
 ```
+
+Windows 桌面开发与发行构建：
+
+```bash
+npm run desktop:dev
+npm run desktop:build
+npm run desktop:webview2
+npm run desktop:portable
+npm run desktop:installer
+npm run desktop:release
+```
+
+桌面发行构建需要 Node.js 22、Rust stable、MSVC x64 工具链和 NSIS。`desktop:webview2` 只从微软官方地址下载 Evergreen Bootstrapper，并按仓库锁定的 SHA-256 校验；普通网页构建不会下载该依赖。
 
 性能基准：
 

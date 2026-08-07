@@ -6,6 +6,8 @@ dist
 coverage
 test-results
 playwright-report
+release
+src-tauri/target
 .vscode/*
 !.vscode/extensions.json
 docs

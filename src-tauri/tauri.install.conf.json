@@ -1,0 +1,20 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "bundle": {
+    "licenseFile": "../LICENSE",
+    "targets": ["nsis"],
+    "resources": {
+      "resources/MicrosoftEdgeWebView2Setup.exe": "runtime/MicrosoftEdgeWebView2Setup.exe",
+      "resources/install-manifest.json": "install-manifest.json"
+    },
+    "windows": {
+      "webviewInstallMode": { "type": "skip" },
+      "nsis": {
+        "installMode": "currentUser",
+        "template": "./nsis/installer.nsi",
+        "installerHooks": "./nsis/installer-hooks.nsh",
+        "languages": ["SimpChinese", "English"]
+      }
+    }
+  }
+}
