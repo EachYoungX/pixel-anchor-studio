@@ -70,6 +70,7 @@ ${UnStrLoc}
 !define UNINSTALLERSIGNCOMMAND "{{uninstaller_sign_cmd}}"
 !define ESTIMATEDSIZE "{{estimated_size}}"
 !define STARTMENUFOLDER "{{start_menu_folder}}"
+!define INSTALLFOLDERNAME "PixelAnchorStudio"
 
 Var PassiveMode
 Var UpdateMode
@@ -88,7 +89,7 @@ OutFile "${OUTFILE}"
 ; We don't actually use this value as default install path,
 ; it's just for nsis to append the product name folder in the directory selector
 ; https://nsis.sourceforge.io/Reference/InstallDir
-!define PLACEHOLDER_INSTALL_DIR "placeholder\${PRODUCTNAME}"
+!define PLACEHOLDER_INSTALL_DIR "placeholder\${INSTALLFOLDERNAME}"
 InstallDir "${PLACEHOLDER_INSTALL_DIR}"
 
 VIProductVersion "${VERSIONWITHBUILD}"
@@ -463,6 +464,7 @@ Function un.ConfirmShow ; Add add a `Delete app data` check box
   Pop $DeleteAppDataCheckbox
   SendMessage $HWNDPARENT ${WM_GETFONT} 0 0 $1
   SendMessage $DeleteAppDataCheckbox ${WM_SETFONT} $1 1
+  SendMessage $DeleteAppDataCheckbox ${BM_SETCHECK} ${BST_CHECKED} 0
 FunctionEnd
 !define MUI_PAGE_CUSTOMFUNCTION_LEAVE un.ConfirmLeave
 Function un.ConfirmLeave
@@ -510,17 +512,17 @@ Function .onInit
     !if "${INSTALLMODE}" == "perMachine"
       ${If} ${RunningX64}
         !if "${ARCH}" == "x64"
-          StrCpy $INSTDIR "$PROGRAMFILES64\${PRODUCTNAME}"
+          StrCpy $INSTDIR "$PROGRAMFILES64\${INSTALLFOLDERNAME}"
         !else if "${ARCH}" == "arm64"
-          StrCpy $INSTDIR "$PROGRAMFILES64\${PRODUCTNAME}"
+          StrCpy $INSTDIR "$PROGRAMFILES64\${INSTALLFOLDERNAME}"
         !else
-          StrCpy $INSTDIR "$PROGRAMFILES\${PRODUCTNAME}"
+          StrCpy $INSTDIR "$PROGRAMFILES\${INSTALLFOLDERNAME}"
         !endif
       ${Else}
-        StrCpy $INSTDIR "$PROGRAMFILES\${PRODUCTNAME}"
+        StrCpy $INSTDIR "$PROGRAMFILES\${INSTALLFOLDERNAME}"
       ${EndIf}
     !else if "${INSTALLMODE}" == "currentUser"
-      StrCpy $INSTDIR "$LOCALAPPDATA\Programs\PixelAnchorStudio"
+      StrCpy $INSTDIR "$LOCALAPPDATA\Programs\${INSTALLFOLDERNAME}"
     !endif
 
     Call RestorePreviousInstallLocation

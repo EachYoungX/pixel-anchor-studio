@@ -1,14 +1,13 @@
 import { beadDocumentStyle, ptToMm } from '@/core/bead/document-style'
 import type { BeadLegendPageLayout, BeadPdfPageLayout, BeadSvgLayout } from '@/core/bead/document-layout'
-import { zhCNBeadDocumentText, type BeadDocumentText } from '@/content/bead-document-text'
 
 export type DocumentCommand =
   | { type: 'rect'; x: number; y: number; width: number; height: number; fill: string; stroke: string; strokeWidthMm: number }
   | { type: 'text'; x: number; y: number; text: string; fontSizePt: number; color: string; align: 'left' | 'center' | 'right' }
 
-export function buildPatternPageCommands(page: BeadPdfPageLayout, text: BeadDocumentText = zhCNBeadDocumentText): DocumentCommand[] {
+export function buildPatternPageCommands(page: BeadPdfPageLayout): DocumentCommand[] {
   const commands: DocumentCommand[] = [
-    { type: 'text', x: 12, y: 12, text: `${text.pattern} ${page.pageNumber} / ${page.totalPages} · ${text.columns} ${page.sliceX + 1}–${page.sliceX + page.sliceWidth} · ${text.rows} ${page.sliceY + 1}–${page.sliceY + page.sliceHeight}`, fontSizePt: beadDocumentStyle.pageHeaderPt, color: '#23272a', align: 'left' },
+    { type: 'text', x: 12, y: 12, text: `P ${page.pageNumber}/${page.totalPages} | C ${page.sliceX + 1}-${page.sliceX + page.sliceWidth} | R ${page.sliceY + 1}-${page.sliceY + page.sliceHeight}`, fontSizePt: beadDocumentStyle.pageHeaderPt, color: '#23272a', align: 'left' },
   ]
   for (const cell of page.cells) {
     commands.push({ type: 'rect', x: cell.x, y: cell.y, width: cell.width, height: cell.height, fill: cell.fill, stroke: '#aab0b6', strokeWidthMm: beadDocumentStyle.gridStrokeWidthMm })
@@ -25,15 +24,15 @@ export function buildPatternPageCommands(page: BeadPdfPageLayout, text: BeadDocu
   return commands
 }
 
-export function buildLegendPageCommands(page: BeadLegendPageLayout, text: BeadDocumentText = zhCNBeadDocumentText): DocumentCommand[] {
-  const commands: DocumentCommand[] = [{ type: 'text', x: 14, y: 16, text: `${text.colorsAndUsage} ${page.pageNumber} / ${page.totalPages}`, fontSizePt: beadDocumentStyle.legendTitlePt, color: '#1e2226', align: 'left' }]
+export function buildLegendPageCommands(page: BeadLegendPageLayout): DocumentCommand[] {
+  const commands: DocumentCommand[] = []
   page.entries.forEach((entry, index) => {
     const x = 14 + Math.floor(index / 16) * beadDocumentStyle.legendColumnWidthMm
-    const y = 26 + (index % 16) * 10
+    const y = 16 + (index % 16) * 10
     commands.push({ type: 'rect', x, y: y - 5, width: 5.5, height: 5.5, fill: entry.hex, stroke: '#969ba0', strokeWidthMm: 0.25 })
     commands.push({ type: 'text', x: x + 8, y, text: entry.code, fontSizePt: beadDocumentStyle.legendTextPt, color: '#1e2226', align: 'left' })
     commands.push({ type: 'text', x: x + 18, y, text: entry.hex, fontSizePt: beadDocumentStyle.legendTextPt, color: '#1e2226', align: 'left' })
-    commands.push({ type: 'text', x: x + 58, y, text: `×${entry.count}`, fontSizePt: beadDocumentStyle.legendTextPt, color: '#1e2226', align: 'right' })
+    commands.push({ type: 'text', x: x + 58, y, text: `x${entry.count}`, fontSizePt: beadDocumentStyle.legendTextPt, color: '#1e2226', align: 'right' })
   })
   return commands
 }

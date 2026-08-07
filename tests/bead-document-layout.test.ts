@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildLegendPageCommands } from '@/core/bead/document-commands'
+import { buildLegendPageCommands, buildPatternPageCommands } from '@/core/bead/document-commands'
 import { createBeadDocumentLayout } from '@/core/bead/document-layout'
 import type { BeadSettings, PaletteEntry, PixelResult } from '@/types/project'
 
@@ -42,21 +42,23 @@ describe('createBeadDocumentLayout', () => {
     const layout = createBeadDocumentLayout(result, palette, settings)
     const commands = buildLegendPageCommands(layout.pdfLegendPages[0])
     const swatches = commands.filter((command) => command.type === 'rect')
-    const quantities = commands.filter((command) => command.type === 'text' && command.text.startsWith('×'))
+    const quantities = commands.filter((command) => command.type === 'text' && command.text.startsWith('x'))
 
     expect(swatches[16].x - swatches[0].x).toBe(72)
     expect(quantities[0].x).toBe(72)
     expect(swatches[16].x - quantities[0].x).toBe(14)
   })
 
-  it('accepts centralized document text without changing layout commands', () => {
+  it('keeps every PDF text command ASCII-only', () => {
     const layout = createBeadDocumentLayout(result, palette, settings)
-    const commands = buildLegendPageCommands(layout.pdfLegendPages[0], {
-      pattern: 'Pattern',
-      colorsAndUsage: 'Colors',
-      columns: 'Columns',
-      rows: 'Rows',
-    })
-    expect(commands[0]).toMatchObject({ type: 'text', text: expect.stringContaining('Colors') })
+    const commands = [
+      ...layout.pdfPages.flatMap(buildPatternPageCommands),
+      ...layout.pdfLegendPages.flatMap(buildLegendPageCommands),
+    ]
+    const textCommands = commands.filter((command) => command.type === 'text')
+    expect(textCommands.length).toBeGreaterThan(0)
+    expect(textCommands.every((command) => /^[\x20-\x7e]*$/.test(command.text))).toBe(true)
+    expect(textCommands.some((command) => command.text.includes('颜色与用量'))).toBe(false)
+    expect(textCommands[0]).toMatchObject({ text: 'P 1/6 | C 1-32 | R 1-32' })
   })
 })

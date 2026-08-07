@@ -114,7 +114,8 @@ fn installed_data_directory() -> (PathBuf, Option<String>) {
         .and_then(|key| key.get_value("InstallId").ok());
     let fallback = dirs::data_local_dir()
         .unwrap_or_else(|| std::env::temp_dir())
-        .join("PixelAnchorStudio");
+        .join("PixelAnchorStudio")
+        .join("data");
     (
         configured
             .filter(|value| !value.trim().is_empty())
@@ -128,7 +129,8 @@ fn installed_data_directory() -> (PathBuf, Option<String>) {
 fn installed_data_directory() -> (PathBuf, Option<String>) {
     let fallback = dirs::data_local_dir()
         .unwrap_or_else(|| std::env::temp_dir())
-        .join("PixelAnchorStudio");
+        .join("PixelAnchorStudio")
+        .join("data");
     (fallback, None)
 }
 

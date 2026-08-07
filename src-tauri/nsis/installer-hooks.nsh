@@ -12,6 +12,8 @@ Var PasDataDirectory
 Var PasInstallId
 Var PasDataInput
 Var PasDataBrowseButton
+Var PasDataDefaultButton
+Var PasDataInstallButton
 Var PasStartMenuCheckbox
 Var PasDesktopCheckbox
 Var PasStartMenuEnabled
@@ -36,7 +38,7 @@ Function PasDataPageCreate
   ReadRegStr $PasDataDirectory HKCU "${PAS_REGKEY}" "DataDirectory"
   ReadRegStr $PasInstallId HKCU "${PAS_REGKEY}" "InstallId"
   ${If} $PasDataDirectory == ""
-    StrCpy $PasDataDirectory "$LOCALAPPDATA\PixelAnchorStudio"
+    StrCpy $PasDataDirectory "$LOCALAPPDATA\PixelAnchorStudio\data"
   ${EndIf}
 
   nsDialogs::Create 1018
@@ -45,25 +47,93 @@ Function PasDataPageCreate
     Abort
   ${EndIf}
   !insertmacro MUI_HEADER_TEXT "应用数据位置" "选择工作台配置、缓存和恢复数据的位置"
-  ${NSD_CreateLabel} 0 0 100% 26u "项目文件和导出结果不会自动保存在这里。自定义位置始终使用独立的 PixelAnchorStudio 子目录。"
+  ${NSD_CreateLabel} 0 0 100% 26u "应用设置、缓存和恢复信息保存在此处。项目文件和导出结果不会自动保存到这里。"
   Pop $0
   ${NSD_CreateText} 0 34u 78% 13u "$PasDataDirectory"
   Pop $PasDataInput
-  SendMessage $PasDataInput ${EM_SETREADONLY} 1 0
   ${NSD_CreateButton} 80% 33u 20% 15u "浏览..."
   Pop $PasDataBrowseButton
   ${NSD_OnClick} $PasDataBrowseButton PasBrowseData
-  ${NSD_CreateLabel} 0 58u 100% 28u "默认：%LOCALAPPDATA%\PixelAnchorStudio。卸载时只有在归属标记匹配且用户勾选删除数据后，安装器才会清理已知子目录。"
+  ${NSD_CreateButton} 0 56u 27% 15u "使用默认位置"
+  Pop $PasDataDefaultButton
+  ${NSD_OnClick} $PasDataDefaultButton PasUseDefaultData
+  ${NSD_CreateButton} 29% 56u 27% 15u "使用安装位置"
+  Pop $PasDataInstallButton
+  ${NSD_OnClick} $PasDataInstallButton PasUseInstallData
+  ${NSD_CreateLabel} 0 82u 100% 26u "默认：%LOCALAPPDATA%\PixelAnchorStudio\data。也可直接输入或粘贴完整的最终数据路径。"
   Pop $0
   nsDialogs::Show
 FunctionEnd
 
+Function PasUseDefaultData
+  StrCpy $PasDataDirectory "$LOCALAPPDATA\PixelAnchorStudio\data"
+  ${NSD_SetText} $PasDataInput "$PasDataDirectory"
+FunctionEnd
+
+Function PasUseInstallData
+  StrCpy $PasDataDirectory "$INSTDIR\data"
+  ${NSD_SetText} $PasDataInput "$PasDataDirectory"
+FunctionEnd
+
+Function PasFindExistingParent
+  Exch $0
+  ${If} $0 == ""
+    StrCpy $0 "$LOCALAPPDATA\PixelAnchorStudio"
+  ${EndIf}
+  ${GetFileName} "$0" $1
+  ${StrCase} $1 "$1" "L"
+  ${If} $1 == "data"
+    ${GetParent} "$0" $0
+  ${EndIf}
+  pas_find_existing_parent:
+    ${If} ${FileExists} "$0\*.*"
+      Goto pas_existing_parent_found
+    ${EndIf}
+    ${GetParent} "$0" $1
+    ${If} $1 == ""
+    ${OrIf} $1 == $0
+      StrCpy $0 "$LOCALAPPDATA"
+      Goto pas_existing_parent_found
+    ${EndIf}
+    StrCpy $0 $1
+    Goto pas_find_existing_parent
+  pas_existing_parent_found:
+  Exch $0
+FunctionEnd
+
+Function PasNormalizeDataRoot
+  Exch $0
+  ${GetFileName} "$0" $1
+  ${StrCase} $1 "$1" "L"
+  ${StrCase} $2 "$0" "L"
+  ${StrCase} $3 "$INSTDIR" "L"
+  ${GetParent} "$0" $4
+  ${GetFileName} "$4" $5
+  ${StrCase} $5 "$5" "L"
+  ${If} $1 == "data"
+  ${AndIf} $5 == "pixelanchorstudio"
+    ; The user selected the final data directory itself.
+  ${ElseIf} $1 == "pixelanchorstudio"
+  ${OrIf} $2 == $3
+    StrCpy $0 "$0\data"
+  ${Else}
+    StrCpy $0 "$0\PixelAnchorStudio\data"
+  ${EndIf}
+  Exch $0
+FunctionEnd
+
 Function PasBrowseData
-  nsDialogs::SelectFolderDialog "选择应用数据根目录" "$LOCALAPPDATA"
+  ${NSD_GetText} $PasDataInput $0
+  Push $0
+  Call PasFindExistingParent
+  Pop $0
+  nsDialogs::SelectFolderDialog "选择应用根目录" "$0"
   Pop $0
   ${If} $0 != error
   ${AndIf} $0 != ""
-    StrCpy $PasDataDirectory "$0\PixelAnchorStudio"
+    Push $0
+    Call PasNormalizeDataRoot
+    Pop $PasDataDirectory
     ${NSD_SetText} $PasDataInput "$PasDataDirectory"
   ${EndIf}
 FunctionEnd
@@ -74,20 +144,33 @@ Function PasDataPageLeave
     MessageBox MB_ICONEXCLAMATION "请选择应用数据位置。"
     Abort
   ${EndIf}
-  ${If} $PasDataDirectory == $INSTDIR
-    MessageBox MB_ICONEXCLAMATION "应用数据位置不能与安装位置相同。"
+  ${If} ${FileExists} "$PasDataDirectory"
+  ${AndIfNot} ${FileExists} "$PasDataDirectory\*.*"
+    MessageBox MB_ICONEXCLAMATION "应用数据位置指向了文件，请选择或输入目录。"
     Abort
   ${EndIf}
-  CreateDirectory "$PasDataDirectory"
+  Push $PasDataDirectory
+  Call PasFindExistingParent
+  Pop $0
   ClearErrors
-  FileOpen $0 "$PasDataDirectory\.pixel-anchor-write-test" w
+  GetTempFileName $1 "$0"
   ${If} ${Errors}
+    MessageBox MB_ICONSTOP "无法在所选路径的现有父目录中创建临时测试项：$\r$\n$0$\r$\n$\r$\n请重新选择。"
+    Abort
+  ${EndIf}
+  Delete "$1"
+  CreateDirectory "$1"
+  ClearErrors
+  FileOpen $2 "$1\write-test" w
+  ${If} ${Errors}
+    RMDir "$1"
     MessageBox MB_ICONSTOP "无法写入应用数据位置：$\r$\n$PasDataDirectory$\r$\n$\r$\n请重新选择。"
     Abort
   ${EndIf}
-  FileWrite $0 "test"
-  FileClose $0
-  Delete "$PasDataDirectory\.pixel-anchor-write-test"
+  FileWrite $2 "test"
+  FileClose $2
+  Delete "$1\write-test"
+  RMDir "$1"
 FunctionEnd
 
 Function PasOptionsPageCreate
@@ -100,7 +183,7 @@ Function PasOptionsPageCreate
   ${EndIf}
   ReadRegDWORD $PasDesktopEnabled HKCU "${PAS_REGKEY}" "DesktopShortcut"
   ${If} $PasDesktopEnabled == ""
-    StrCpy $PasDesktopEnabled ${BST_CHECKED}
+    StrCpy $PasDesktopEnabled ${BST_UNCHECKED}
   ${EndIf}
 
   nsDialogs::Create 1018
@@ -225,7 +308,7 @@ FunctionEnd
     ReadRegStr $PasInstallId HKCU "${PAS_REGKEY}" "InstallId"
   ${EndIf}
   ${If} $PasDataDirectory == ""
-    StrCpy $PasDataDirectory "$LOCALAPPDATA\PixelAnchorStudio"
+    StrCpy $PasDataDirectory "$LOCALAPPDATA\PixelAnchorStudio\data"
   ${EndIf}
   ${If} $PasInstallId == ""
     System::Call 'ole32::CoCreateGuid(g .s) i.r0'
@@ -240,7 +323,7 @@ FunctionEnd
   ${If} $PasDesktopEnabled == ""
     ReadRegDWORD $PasDesktopEnabled HKCU "${PAS_REGKEY}" "DesktopShortcut"
     ${If} $PasDesktopEnabled == ""
-      StrCpy $PasDesktopEnabled ${BST_CHECKED}
+      StrCpy $PasDesktopEnabled ${BST_UNCHECKED}
     ${EndIf}
   ${EndIf}
   !insertmacro PAS_CREATE_OWNER_MARKER
@@ -302,6 +385,8 @@ FunctionEnd
         RMDir /r "$PasDataDirectory\recovery"
         Delete "$PasDataDirectory\${PAS_OWNER_FILE}"
         RMDir "$PasDataDirectory"
+        ${GetParent} "$PasDataDirectory" $6
+        RMDir "$6"
         ${If} ${FileExists} "$PasDataDirectory\*.*"
           MessageBox MB_ICONINFORMATION "应用内部数据目录中仍有未知文件，因此保留该目录：$\r$\n$PasDataDirectory"
         ${EndIf}
