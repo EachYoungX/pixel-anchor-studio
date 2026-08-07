@@ -10,4 +10,4 @@ release
 src-tauri/target
 .vscode/*
 !.vscode/extensions.json
-docs
+internal-docs

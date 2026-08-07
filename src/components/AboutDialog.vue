@@ -50,7 +50,7 @@ watch(() => props.open, (open) => {
       <div class="about-content">
         <section v-if="activeTab === 'usage'" class="about-section">
           <h3>快速开始</h3>
-          <ol><li>导入图片并选择图像范围</li><li>选择像素化方式，生成并编辑结果</li><li>检查拼豆 PDF 分页或 SVG 总览</li><li>从对应工作区导出文件</li></ol>
+          <ol><li>点击右上角导入图片或者将图片直接拖拽到工作页面并选择图像裁剪范围</li><li>选择像素化方式以及采样与颜色处理方式，生成并编辑结果</li><li>检查拼豆 PDF 分页或 SVG 总览</li><li>从对应工作区导出文件</li></ol>
           <h3>常用操作</h3>
           <p>位于原图与网格和像素结果区域：</p>
           <p>缩放：<kbd>Ctrl / Command</kbd> + <kbd>滚轮</kbd></p>
