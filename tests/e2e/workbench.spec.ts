@@ -576,9 +576,9 @@ test('shows quick start once and reopens release notes and license from the titl
   await expect(dialog.getByRole('heading', { name: '快速开始' })).toBeVisible()
 
   await dialog.getByRole('button', { name: '更新日志' }).click()
-  await expect(dialog.getByText('v0.5.0')).toBeVisible()
-  await expect(dialog.getByRole('heading', { name: '桌面应用' })).toBeVisible()
-  await expect(dialog.getByRole('heading', { name: '桌面交互' })).toBeVisible()
+  await expect(dialog.getByText(/v0\.5\.1/)).toBeVisible()
+  await expect(dialog.getByRole('heading', { name: '桌面安装' })).toBeVisible()
+  await expect(dialog.getByRole('heading', { name: '文件操作' })).toBeVisible()
 
   await dialog.getByRole('button', { name: '项目与许可' }).click()
   await expect(dialog.getByRole('heading', { name: '项目声明' })).toBeVisible()

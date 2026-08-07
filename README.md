@@ -8,10 +8,10 @@
 
 ## Windows 桌面版
 
-v0.5.0 提供两种 Windows 10/11 x64 发行形式：
+v0.5.1 提供两种 Windows 10/11 x64 发行形式：
 
 - **便携版**：完整解压后直接运行，应用设置、WebView 数据、缓存和恢复数据均位于便携目录的 `data` 文件夹；移动整个目录即可迁移；
-- **安装版**：按当前用户安装，可修改安装位置和应用数据位置，并创建开始菜单及桌面快捷方式。
+- **安装版**：按当前用户安装，可修改安装位置和应用数据位置；默认数据目录为 `%LOCALAPPDATA%\PixelAnchorStudio\data`，开始菜单快捷方式默认创建，桌面快捷方式可按需勾选。
 
 桌面版不需要 Node.js、npm、Rust、Vite、本地服务器或独立浏览器。它使用系统 Microsoft Edge WebView2 Runtime；系统缺少该组件时，程序会在创建窗口前说明并提供微软官方安装入口。WebView2 已安装时，图片处理、项目读写和全部导出功能均可断网使用。
 
@@ -19,16 +19,18 @@ v0.5.0 提供两种 Windows 10/11 x64 发行形式：
 
 ### SmartScreen 与校验
 
-首个桌面测试版本可能尚未进行 Windows 代码签名，因此 SmartScreen 可能显示“Windows 已保护你的电脑”。请只从本项目官方 GitHub Release 下载，并先核对 Release 提供的 `SHA256SUMS.txt`。确认来源和 SHA-256 完全一致后，可点击“更多信息”，再点击“仍要运行”。不建议关闭 SmartScreen，也不要从第三方网站下载安装包。
+当前桌面测试版本尚未进行 Windows 代码签名，因此 Microsoft Defender SmartScreen 可能显示“Windows 已保护你的电脑”。请只从本项目官方 GitHub 仓库的 Actions Artifact 或 Release 下载，并核对随包提供的 `SHA256SUMS.txt`。确认来源和 SHA-256 完全一致后，点击“更多信息”，检查应用名称，再点击“仍要运行”。不要关闭 SmartScreen，也不要从第三方网站下载安装包。
 
 PowerShell 校验示例：
 
 ```powershell
-Get-FileHash .\PixelAnchorStudio-0.5.0-Setup.exe -Algorithm SHA256
-Get-FileHash .\PixelAnchorStudio-0.5.0-Portable.zip -Algorithm SHA256
+Get-FileHash .\PixelAnchorStudio-0.5.1-Setup.exe -Algorithm SHA256
+Get-FileHash .\PixelAnchorStudio-0.5.1-Portable.zip -Algorithm SHA256
 ```
 
-便携版删除整个解压目录时，也会删除该目录中的设置、缓存以及用户自行放入的项目或导出文件；删除前请先移动需要保留的文件。安装版卸载器只删除应用清单中的文件和经过所有权标记确认的内部数据，安装目录或自定义数据目录中的未知文件会保留并提示。
+便携版删除整个解压目录时，也会删除该目录中的设置、缓存以及用户自行放入的项目或导出文件；删除前请先移动需要保留的文件。安装版卸载时默认勾选删除应用数据，但只删除经过所有权标记确认的内部数据；安装目录或自定义数据目录中的未知文件会保留并提示。
+
+日常 Push 只运行检查和端到端测试，不生成桌面安装包。需要测试 Windows 安装版与便携版时，在 GitHub Actions 中手动运行 `Desktop Build`；其 Artifact 保留 14 天，不会自动发布到 Releases。
 
 ## 能做什么
 

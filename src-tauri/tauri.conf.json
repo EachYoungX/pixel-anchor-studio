@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "锚点像素工作台",
   "mainBinaryName": "PixelAnchorStudio",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "identifier": "com.eachyoung.pixel-anchor-studio",
   "build": {
     "frontendDist": "../dist",
