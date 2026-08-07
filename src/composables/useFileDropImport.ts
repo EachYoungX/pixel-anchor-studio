@@ -1,9 +1,11 @@
 import { onBeforeUnmount, onMounted, ref, type Ref } from 'vue'
 import { decideDropImport, SUPPORTED_DROP_TYPES_TEXT, type DroppedDirectory } from '@/core/import/drop-files'
+import { getPlatformService } from '@/platform'
+import { isDesktopPlatform } from '@/platform/platform-detection'
 
 interface FileDropImportOptions {
   importImage: (file: File) => Promise<void>
-  importProject: (file: File) => Promise<void>
+  importProject: (file: File, path?: string) => Promise<void>
 }
 
 export interface ImportNotice {
@@ -49,6 +51,7 @@ export function useFileDropImport(options: FileDropImportOptions): FileDropImpor
   let dragDepth = 0
   let noticeId = 0
   let noticeTimer: ReturnType<typeof setTimeout> | undefined
+  let unlistenDesktopDrop: (() => void) | undefined
 
   function dismissNotice(): void {
     if (noticeTimer) clearTimeout(noticeTimer)
@@ -88,14 +91,8 @@ export function useFileDropImport(options: FileDropImportOptions): FileDropImpor
     if (dragDepth === 0) dropActive.value = false
   }
 
-  async function handleDrop(event: DragEvent): Promise<void> {
-    if (!containsFiles(event.dataTransfer)) return
-    event.preventDefault()
-    const dataTransfer = event.dataTransfer
-    resetDragState()
-    if (!dataTransfer) return
-
-    const decision = decideDropImport(Array.from(dataTransfer.files), getDirectories(dataTransfer))
+  async function processDroppedFiles(files: File[], directories: DroppedDirectory[] = [], paths = new Map<File, string>()): Promise<void> {
+    const decision = decideDropImport(files, directories)
     if (decision.kind === 'reject') {
       showNotice('error', `无法导入“${decision.fileName}”`, `${decision.reason}。支持类型：${SUPPORTED_DROP_TYPES_TEXT}。当前项目未受影响。`)
       return
@@ -103,7 +100,7 @@ export function useFileDropImport(options: FileDropImportOptions): FileDropImpor
 
     try {
       if (decision.kind === 'project') {
-        await options.importProject(decision.file)
+        await options.importProject(decision.file, paths.get(decision.file))
         showNotice('success', `已打开“${decision.file.name}”`, '项目文件已在本地读取。')
         return
       }
@@ -118,6 +115,43 @@ export function useFileDropImport(options: FileDropImportOptions): FileDropImpor
     }
   }
 
+  async function handleDrop(event: DragEvent): Promise<void> {
+    if (!containsFiles(event.dataTransfer)) return
+    event.preventDefault()
+    const dataTransfer = event.dataTransfer
+    resetDragState()
+    if (!dataTransfer) return
+    await processDroppedFiles(Array.from(dataTransfer.files), getDirectories(dataTransfer))
+  }
+
+  async function registerDesktopDrop(): Promise<void> {
+    if (!isDesktopPlatform()) return
+    const { getCurrentWebview } = await import('@tauri-apps/api/webview')
+    unlistenDesktopDrop = await getCurrentWebview().onDragDropEvent(async (event) => {
+      if (event.payload.type === 'enter' || event.payload.type === 'over') {
+        dropActive.value = true
+        return
+      }
+      if (event.payload.type === 'leave') {
+        resetDragState()
+        return
+      }
+      resetDragState()
+      try {
+        const payloads = await (await getPlatformService()).readDroppedFiles(event.payload.paths)
+        const pathMap = new Map<File, string>()
+        const files = payloads.map((payload) => {
+          const file = new File([new Uint8Array(payload.data)], payload.name, { type: payload.mime })
+          if (payload.path) pathMap.set(file, payload.path)
+          return file
+        })
+        await processDroppedFiles(files, [], pathMap)
+      } catch (error) {
+        showNotice('error', '无法导入拖入内容', `${errorMessage(error, '文件或文件夹不受支持')}。支持类型：${SUPPORTED_DROP_TYPES_TEXT}。当前项目未受影响。`)
+      }
+    })
+  }
+
   onMounted(() => {
     window.addEventListener('dragenter', handleDragEnter)
     window.addEventListener('dragover', handleDragOver)
@@ -125,6 +159,7 @@ export function useFileDropImport(options: FileDropImportOptions): FileDropImpor
     window.addEventListener('drop', handleDrop)
     window.addEventListener('blur', resetDragState)
     window.addEventListener('dragend', resetDragState)
+    void registerDesktopDrop()
   })
 
   onBeforeUnmount(() => {
@@ -134,6 +169,7 @@ export function useFileDropImport(options: FileDropImportOptions): FileDropImpor
     window.removeEventListener('drop', handleDrop)
     window.removeEventListener('blur', resetDragState)
     window.removeEventListener('dragend', resetDragState)
+    unlistenDesktopDrop?.()
     dismissNotice()
   })
 

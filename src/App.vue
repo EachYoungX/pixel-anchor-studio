@@ -13,14 +13,24 @@ import { useGlobalShortcuts } from '@/composables/useGlobalShortcuts'
 import { useFileDropImport } from '@/composables/useFileDropImport'
 import { parseProjectFile } from '@/core/export/project'
 import DropImportOverlay from '@/components/DropImportOverlay.vue'
+import UnsavedChangesDialog from '@/components/UnsavedChangesDialog.vue'
+import { useDesktopWindowLifecycle } from '@/composables/useDesktopWindowLifecycle'
+import { getPlatformService } from '@/platform'
 
 const store = useProjectStore()
 const workspaceMode = ref<WorkspaceMode>('pixel')
 useGlobalShortcuts()
 const { dropActive, notice: importNotice, dismissNotice } = useFileDropImport({
-  importImage: (file) => store.importImage(file),
-  importProject: async (file) => store.loadSerialized(await parseProjectFile(file)),
+  importImage: async (file) => {
+    await store.importImage(file)
+    await (await getPlatformService()).adoptProjectPath()
+  },
+  importProject: async (file, path) => {
+    await store.loadSerialized(await parseProjectFile(file), path)
+    await (await getPlatformService()).adoptProjectPath(path)
+  },
 })
+const windowLifecycle = useDesktopWindowLifecycle()
 </script>
 
 <template>
@@ -69,6 +79,13 @@ const { dropActive, notice: importNotice, dismissNotice } = useFileDropImport({
       <span v-if="store.lastDurationMs > 0">处理耗时 {{ store.lastDurationMs.toFixed(0) }} ms</span>
     </footer>
     <DropImportOverlay :active="dropActive" />
+    <UnsavedChangesDialog
+      :open="windowLifecycle.closePromptOpen.value"
+      :saving="windowLifecycle.savingBeforeClose.value"
+      @save="windowLifecycle.saveAndExit"
+      @discard="windowLifecycle.discardAndExit"
+      @cancel="windowLifecycle.cancelClose"
+    />
     <Transition name="import-notice">
       <aside
         v-if="importNotice"

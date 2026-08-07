@@ -3,6 +3,7 @@ import { nextTick, ref, watch } from 'vue'
 import BrandLogo from '@/components/BrandLogo.vue'
 import { latestRelease } from '@/content/release-notes'
 import licenseText from '../../LICENSE?raw'
+import { getPlatformService } from '@/platform'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ close: [] }>()
@@ -10,6 +11,10 @@ const closeButton = ref<HTMLButtonElement | null>(null)
 const activeTab = ref<'usage' | 'release' | 'project'>('usage')
 
 function focusDialog(): void { nextTick(() => closeButton.value?.focus()) }
+async function openExternal(event: MouseEvent, url: string): Promise<void> {
+  event.preventDefault()
+  await (await getPlatformService()).openExternalUrl(url)
+}
 function handleKeydown(event: KeyboardEvent): void {
   if (event.key === 'Escape') { event.preventDefault(); emit('close'); return }
   if (event.key !== 'Tab') return
@@ -67,7 +72,7 @@ watch(() => props.open, (open) => {
             </div>
           </template>
           <p v-else>暂无可显示的更新记录。</p>
-          <a href="https://github.com/EachYoungX/pixel-anchor-studio/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer">查看完整更新日志</a>
+          <a href="https://github.com/EachYoungX/pixel-anchor-studio/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer" @click="openExternal($event, 'https://github.com/EachYoungX/pixel-anchor-studio/blob/main/CHANGELOG.md')">查看完整更新日志</a>
         </section>
         <section v-else class="about-section project-license">
           <h3>项目声明</h3>
@@ -83,7 +88,7 @@ watch(() => props.open, (open) => {
       </div>
       <footer class="about-footer">
         <button class="button" type="button" @click="emit('close')">关闭</button>
-        <a class="button button-primary" href="https://github.com/EachYoungX/pixel-anchor-studio" target="_blank" rel="noreferrer">打开 GitHub 项目</a>
+        <a class="button button-primary" href="https://github.com/EachYoungX/pixel-anchor-studio" target="_blank" rel="noreferrer" @click="openExternal($event, 'https://github.com/EachYoungX/pixel-anchor-studio')">打开 GitHub 项目</a>
       </footer>
     </section>
   </div>

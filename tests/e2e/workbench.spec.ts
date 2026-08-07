@@ -60,6 +60,19 @@ async function openWorkbench(page: Page): Promise<void> {
   await dialog.locator('.about-footer').getByRole('button', { name: '关闭' }).click()
 }
 
+async function chooseImage(page: Page, file: { name: string; mimeType: string; buffer: Buffer }): Promise<void> {
+  const chooser = page.waitForEvent('filechooser')
+  await page.getByRole('button', { name: '导入图片' }).click()
+  await (await chooser).setFiles(file)
+}
+
+async function chooseProject(page: Page, file: { name: string; mimeType: string; buffer: Buffer }): Promise<void> {
+  await page.getByRole('button', { name: '项目' }).click()
+  const chooser = page.waitForEvent('filechooser')
+  await page.getByRole('menuitem', { name: '打开项目' }).click()
+  await (await chooser).setFiles(file)
+}
+
 interface BrowserDropFile {
   name: string
   mimeType: string
@@ -152,7 +165,7 @@ test('imports, processes, edits, and keeps both canvas viewports aligned', async
   expect(resultEmptyLayout.userSelect).toBe('none')
   expect(resultEmptyLayout.height).toBeCloseTo(resultEmptyLayout.parentHeight ?? 0, 0)
 
-  await page.locator('input[type="file"]').nth(0).setInputFiles({
+  await chooseImage(page, {
     name: 'v040-smoke.png',
     mimeType: 'image/png',
     buffer: createSmokePng(48, 32),
@@ -171,10 +184,11 @@ test('imports, processes, edits, and keeps both canvas viewports aligned', async
   await expect.poll(async () => (await sourceCanvas.screenshot()).equals(sourceBeforeZoom)).toBe(false)
 
   const sourceBeforePan = await sourceCanvas.screenshot()
-  await page.keyboard.down('Space')
   await page.mouse.move(sourceBox!.x + 80, sourceBox!.y + 80)
+  await page.keyboard.down('Space')
   await page.mouse.down()
-  await page.mouse.move(sourceBox!.x + 140, sourceBox!.y + 120)
+  await page.mouse.move(sourceBox!.x + 140, sourceBox!.y + 120, { steps: 5 })
+  await page.waitForTimeout(32)
   await page.mouse.up()
   await page.keyboard.up('Space')
   await expect.poll(async () => (await sourceCanvas.screenshot()).equals(sourceBeforePan)).toBe(false)
@@ -350,7 +364,7 @@ test('imports, processes, edits, and keeps both canvas viewports aligned', async
 test('keeps the pixel result viewport visible in a narrow browser', async ({ page }) => {
   await page.setViewportSize({ width: 470, height: 738 })
   await openWorkbench(page)
-  await page.locator('input[type="file"]').nth(0).setInputFiles({
+  await chooseImage(page, {
     name: 'v042-narrow.png',
     mimeType: 'image/png',
     buffer: createSmokePng(48, 32),
@@ -383,7 +397,7 @@ test('keeps document scrolling and completes crop, project, and bead export flow
   const pageErrors: string[] = []
   page.on('pageerror', (error) => pageErrors.push(error.message))
   await openWorkbench(page)
-  await page.locator('input[type="file"]').nth(0).setInputFiles({
+  await chooseImage(page, {
     name: 'v040-roundtrip.png',
     mimeType: 'image/png',
     buffer: createSmokePng(48, 32),
@@ -406,15 +420,12 @@ test('keeps document scrolling and completes crop, project, and bead export flow
   await page.locator('.merge-button:not(:disabled)').first().click()
   await expect(page.getByRole('button', { name: '撤销' })).toBeEnabled()
 
-  const brokenImageDialog = page.waitForEvent('dialog')
-  await page.locator('input[type="file"]').nth(0).setInputFiles({
+  await chooseImage(page, {
     name: 'broken.png',
     mimeType: 'image/png',
     buffer: Buffer.from('not-an-image'),
   })
-  const imageDialog = await brokenImageDialog
-  expect(imageDialog.message()).toContain('无法解码图片')
-  await imageDialog.accept()
+  await expect(page.getByText(/图片导入失败：无法解码图片/)).toBeVisible()
   await expect(page.getByText('v040-roundtrip.png · 48 × 32', { exact: true })).toBeVisible()
   await expect(page.getByText(/输出 32 × 32/)).toBeVisible()
   await expect(page.getByRole('button', { name: '撤销' })).toBeEnabled()
@@ -438,21 +449,18 @@ test('keeps document scrolling and completes crop, project, and bead export flow
   await expect(page.getByRole('button', { name: '撤销' })).toBeEnabled()
   const corruptedProject = JSON.parse(savedProject.toString('utf8'))
   corruptedProject.source.dataBase64 = Buffer.from('not-an-image').toString('base64')
-  const brokenProjectDialog = page.waitForEvent('dialog')
-  await page.locator('input[type="file"]').nth(1).setInputFiles({
+  await chooseProject(page, {
     name: 'broken.pixel-anchor.json',
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify(corruptedProject)),
   })
-  const projectDialog = await brokenProjectDialog
-  expect(projectDialog.message()).toContain('无法解码图片')
-  await projectDialog.accept()
+  await expect(page.getByText(/项目文件打开失败：无法解码图片/)).toBeVisible()
   await expect(page.getByText('v040-roundtrip.png · 48 × 32', { exact: true })).toBeVisible()
   await expect(page.getByText(/输出 32 × 32/)).toBeVisible()
   await expect(page.getByRole('button', { name: '撤销' })).toBeEnabled()
   await page.getByRole('button', { name: '撤销' }).click()
 
-  await page.locator('input[type="file"]').nth(1).setInputFiles({
+  await chooseProject(page, {
     name: 'v040-roundtrip.pixel-anchor.json',
     mimeType: 'application/json',
     buffer: savedProject,
@@ -471,7 +479,7 @@ test('keeps document scrolling and completes crop, project, and bead export flow
 
 test('keeps source drag capture outside the canvas and commits crop drafts on release', async ({ page }) => {
   await openWorkbench(page)
-  await page.locator('input[type="file"]').nth(0).setInputFiles({
+  await chooseImage(page, {
     name: 'v041-drag.png',
     mimeType: 'image/png',
     buffer: createSmokePng(48, 32),
@@ -535,9 +543,9 @@ test('shows quick start once and reopens release notes and license from the titl
   await expect(dialog.getByRole('heading', { name: '快速开始' })).toBeVisible()
 
   await dialog.getByRole('button', { name: '更新日志' }).click()
-  await expect(dialog.getByText('v0.4.3')).toBeVisible()
-  await expect(dialog.getByRole('heading', { name: '修复' })).toBeVisible()
-  await expect(dialog.getByRole('heading', { name: '稳定性' })).toBeVisible()
+  await expect(dialog.getByText('v0.5.0')).toBeVisible()
+  await expect(dialog.getByRole('heading', { name: '桌面应用' })).toBeVisible()
+  await expect(dialog.getByRole('heading', { name: '桌面交互' })).toBeVisible()
 
   await dialog.getByRole('button', { name: '项目与许可' }).click()
   await expect(dialog.getByRole('heading', { name: '项目声明' })).toBeVisible()

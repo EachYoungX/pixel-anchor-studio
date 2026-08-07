@@ -1,4 +1,4 @@
-import { downloadBlob } from '@/core/export/download'
+import { saveBlob } from '@/core/export/download'
 import type { PixelResult } from '@/types/project'
 
 function resultToCanvas(result: PixelResult, scale: number): HTMLCanvasElement {
@@ -20,10 +20,10 @@ function resultToCanvas(result: PixelResult, scale: number): HTMLCanvasElement {
   return canvas
 }
 
-export async function exportPng(result: PixelResult, filename: string, scale: number): Promise<void> {
+export async function exportPng(result: PixelResult, filename: string, scale: number): Promise<boolean> {
   const canvas = resultToCanvas(result, Math.max(1, Math.floor(scale)))
   const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((value) => (value ? resolve(value) : reject(new Error('PNG生成失败'))), 'image/png')
   })
-  downloadBlob(blob, filename)
+  return saveBlob(blob, filename, ['png'], 'PNG 图片')
 }

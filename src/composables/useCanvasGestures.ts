@@ -29,6 +29,11 @@ export function useCanvasGestures(options: CanvasGestureOptions) {
     return Boolean(element && (element.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(element.tagName)))
   }
 
+  function isTypingTarget(target: EventTarget | null): boolean {
+    const element = target as HTMLElement | null
+    return Boolean(element && (element.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA'].includes(element.tagName)))
+  }
+
   function canPan(event: PointerEvent): boolean {
     return (spacePressed.value || event.button === 1) && !isEditableTarget(event.target) && (options.canStartPan?.(event) ?? true)
   }
@@ -93,12 +98,13 @@ export function useCanvasGestures(options: CanvasGestureOptions) {
   }
 
   function onKeyDown(event: KeyboardEvent): void {
-    if (isEditableTarget(event.target)) return
+    if (isTypingTarget(event.target)) return
     const element = options.element.value
-    if (event.code === 'Space' && (pointerInside.value || element === document.activeElement || element?.contains(document.activeElement))) {
-      spacePressed.value = true
-      event.preventDefault()
-    }
+    if (event.code !== 'Space') return
+    // Record Space globally so a user can hold it before moving onto a canvas.
+    // Only suppress normal page scrolling while this canvas is the active target.
+    spacePressed.value = true
+    if (pointerInside.value || element === document.activeElement || element?.contains(document.activeElement)) event.preventDefault()
   }
 
   function onKeyUp(event: KeyboardEvent): void {

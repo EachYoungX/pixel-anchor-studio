@@ -1,4 +1,3 @@
-import { downloadBlob } from '@/core/export/download'
 import { migrateProject } from '@/domain/project/migrations'
 import type { SerializedProject } from '@/types/project'
 
@@ -18,13 +17,16 @@ export function base64ToBytes(value: string): Uint8ClampedArray {
   return bytes
 }
 
-export function exportProjectFile(project: SerializedProject, filename: string): void {
-  const content = JSON.stringify(project)
-  downloadBlob(new Blob([content], { type: 'application/json;charset=utf-8' }), filename)
+export function encodeProjectFile(project: SerializedProject): Uint8Array {
+  return new TextEncoder().encode(JSON.stringify(project))
 }
 
 export async function parseProjectFile(file: File): Promise<SerializedProject> {
   return migrateProject(JSON.parse(await file.text()))
+}
+
+export function parseProjectBytes(data: Uint8Array): SerializedProject {
+  return migrateProject(JSON.parse(new TextDecoder().decode(data)))
 }
 
 export { migrateProject }

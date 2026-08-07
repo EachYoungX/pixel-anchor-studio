@@ -1,15 +1,13 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
-import { sanitizeFilename } from '@/core/export/download'
-import { exportProjectFile, parseProjectFile } from '@/core/export/project'
 import { useProjectStore } from '@/stores/project'
 import BrandLogo from '@/components/BrandLogo.vue'
 import AboutDialog from '@/components/AboutDialog.vue'
 import { markQuickStartSeen, shouldShowQuickStart } from '@/core/onboarding'
+import { useProjectFileActions } from '@/composables/useProjectFileActions'
 
 const store = useProjectStore()
-const imageInput = ref<HTMLInputElement | null>(null)
-const projectInput = ref<HTMLInputElement | null>(null)
+const fileActions = useProjectFileActions()
 const brandButton = ref<HTMLButtonElement | null>(null)
 const projectMenu = ref<HTMLElement | null>(null)
 const projectMenuButton = ref<HTMLButtonElement | null>(null)
@@ -67,42 +65,14 @@ function openAbout(): void {
   aboutOpen.value = true
 }
 
-async function handleImage(event: Event): Promise<void> {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  input.value = ''
-  if (!file) return
-  try {
-    await store.importImage(file)
-  } catch (error) {
-    window.alert(error instanceof Error ? error.message : '图片导入失败')
-  }
-}
-
-async function handleProject(event: Event): Promise<void> {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  input.value = ''
-  if (!file) return
-  try {
-    await store.loadSerialized(await parseProjectFile(file))
-  } catch (error) {
-    window.alert(error instanceof Error ? error.message : '项目文件打开失败')
-  }
-}
-
 async function saveProject(): Promise<void> {
   projectMenuOpen.value = false
-  try {
-    exportProjectFile(await store.serialize(), `${sanitizeFilename(store.source?.name ?? 'pixel-art')}.pixel-anchor.json`)
-  } catch (error) {
-    window.alert(error instanceof Error ? error.message : '项目保存失败')
-  }
+  await fileActions.saveProject()
 }
 
 function openProjectPicker(): void {
   projectMenuOpen.value = false
-  projectInput.value?.click()
+  void fileActions.openProject()
 }
 
 </script>
@@ -117,19 +87,18 @@ function openProjectPicker(): void {
       </button>
     </div>
     <nav class="top-actions" aria-label="文件和历史操作">
-      <button class="button" type="button" @click="imageInput?.click()">导入图片</button>
+      <button class="button" type="button" @click="fileActions.importImage">导入图片</button>
       <div ref="projectMenu" class="project-menu">
         <button ref="projectMenuButton" class="button" type="button" aria-haspopup="menu" :aria-expanded="projectMenuOpen" @click="toggleProjectMenu">项目</button>
         <div v-if="projectMenuOpen" class="project-menu__panel" role="menu">
           <button ref="firstProjectMenuItem" class="project-menu__item" role="menuitem" type="button" @click="openProjectPicker">打开项目</button>
           <button class="project-menu__item" role="menuitem" type="button" :disabled="!store.source" @click="saveProject">保存项目</button>
+          <button class="project-menu__item" role="menuitem" type="button" :disabled="!store.source" @click="projectMenuOpen = false; fileActions.saveProjectAs()">项目另存为</button>
         </div>
       </div>
       <button class="button" type="button" :disabled="!store.canUndo" :title="`撤销：${store.undoLabel}`" @click="store.undo">撤销</button>
       <button class="button" type="button" :disabled="!store.canRedo" :title="`重做：${store.redoLabel}`" @click="store.redo">重做</button>
     </nav>
-    <input ref="imageInput" class="hidden-input" type="file" accept="image/*" @change="handleImage" />
-    <input ref="projectInput" class="hidden-input" type="file" accept=".json,application/json" @change="handleProject" />
     <AboutDialog :open="aboutOpen" @close="closeAbout" />
   </header>
 </template>
@@ -155,5 +124,4 @@ function openProjectPicker(): void {
 .project-menu__panel { position: absolute; z-index: 12; top: calc(100% + 6px); right: 0; min-width: 132px; padding: 5px; border: 1px solid var(--border); border-radius: 8px; background: #fff; box-shadow: 0 10px 28px rgba(20, 24, 28, 0.14); }
 .project-menu__item { width: 100%; padding: 8px 10px; border: 0; border-radius: 5px; background: transparent; color: var(--text); text-align: left; }
 .project-menu__item:hover:not(:disabled), .project-menu__item:focus-visible { background: var(--surface-muted); }
-.hidden-input { display: none; }
 </style>

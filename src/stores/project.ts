@@ -60,6 +60,8 @@ export const useProjectStore = defineStore('project', () => {
   const future = ref<HistoryEntry[]>([])
   const pixelEditDirtyBounds = ref<DirtyBounds | null>(null)
   const resultRevisionState = ref(0)
+  const dirty = ref(false)
+  const currentProjectPath = ref<string | undefined>()
   const resultRevision = computed(() => resultRevisionState.value)
   const canUndo = computed(() => history.value.length > 0)
   const canRedo = computed(() => future.value.length > 0)
@@ -68,6 +70,7 @@ export const useProjectStore = defineStore('project', () => {
   let latestProcessId = 0
   let latestSourceLoadId = 0
   let sourceRevision = 0
+  let suppressDirty = false
   const sourceId = ref('source-0')
   const processingService = new ProcessingService()
   const sourceSession = new SourceSession()
@@ -124,6 +127,20 @@ export const useProjectStore = defineStore('project', () => {
 
   function notifyResultChanged(): void {
     resultRevisionState.value += 1
+    if (!suppressDirty) dirty.value = true
+  }
+
+  watch([crop, anchor, scale, processing, bead], () => {
+    if (!suppressDirty) dirty.value = true
+  }, { deep: true, flush: 'sync' })
+
+  function markSaved(path?: string): void {
+    dirty.value = false
+    if (path) currentProjectPath.value = path
+  }
+
+  function abandonChanges(): void {
+    dirty.value = false
   }
 
   async function importImage(file: File): Promise<void> {
@@ -155,6 +172,8 @@ export const useProjectStore = defineStore('project', () => {
     history.value = []
     future.value = []
     colorCodes.value = {}
+    currentProjectPath.value = undefined
+    dirty.value = true
     const memoryHint = loaded.estimatedRgbaBytes >= 120 * 1024 * 1024 ? ' 图片较大，处理将交给后台并可能需要更多时间。' : ''
     status.value = `图片已导入，调整裁剪和转换参数后生成预览。${memoryHint}`
   }
@@ -409,7 +428,7 @@ export const useProjectStore = defineStore('project', () => {
     }
   }
 
-  async function loadSerialized(project: SerializedProject): Promise<void> {
+  async function loadSerialized(project: SerializedProject, projectPath?: string): Promise<void> {
     const loadId = ++latestSourceLoadId
     let loaded: SourceSessionValue | null = null
     try {
@@ -431,6 +450,7 @@ export const useProjectStore = defineStore('project', () => {
         if (loaded) sourceSession.discard(loaded)
         return
       }
+      suppressDirty = true
       adoptSource(loaded)
       Object.assign(crop, project.cropSettings.customRect)
       cropSettings.mode = project.cropSettings.mode
@@ -446,8 +466,12 @@ export const useProjectStore = defineStore('project', () => {
       history.value = []
       future.value = []
       refreshPalette()
+      currentProjectPath.value = projectPath
+      dirty.value = false
+      suppressDirty = false
       status.value = '项目已打开'
     } catch (error) {
+      suppressDirty = false
       if (loaded) sourceSession.discard(loaded)
       if (loadId === latestSourceLoadId) status.value = '项目打开失败，当前项目未受影响'
       throw error
@@ -465,6 +489,8 @@ export const useProjectStore = defineStore('project', () => {
     bead,
     result,
     resultRevision,
+    dirty,
+    currentProjectPath,
     palette,
     selectedColor,
     mergeStrength,
@@ -508,6 +534,8 @@ export const useProjectStore = defineStore('project', () => {
     redo,
     serialize,
     loadSerialized,
+    markSaved,
+    abandonChanges,
     refreshPalette,
     releaseCurrentSource,
   }

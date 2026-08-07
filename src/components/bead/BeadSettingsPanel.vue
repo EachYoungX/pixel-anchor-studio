@@ -8,17 +8,29 @@ import { sanitizeFilename } from '@/core/export/download'
 const store = useProjectStore()
 
 function baseName(): string { return sanitizeFilename(store.source?.name ?? 'pixel-art') }
-function saveSvg(): void {
+async function saveSvg(): Promise<void> {
   if (!store.result || !store.canExportBead) return
-  exportBeadSvg(store.result, store.palette, `${baseName()}-bead-chart.svg`, store.bead.cellSize, store.bead.indexFromOne)
+  try {
+    if (await exportBeadSvg(store.result, store.palette, `${baseName()}-bead-chart.svg`, store.bead.cellSize, store.bead.indexFromOne)) store.status = 'SVG 已导出'
+  } catch (error) {
+    store.status = error instanceof Error ? `SVG 导出失败：${error.message}` : 'SVG 导出失败'
+  }
 }
-function savePdf(): void {
+async function savePdf(): Promise<void> {
   if (!store.result || !store.canExportBead) return
-  exportBeadPdf(store.result, store.palette, store.bead, `${baseName()}-bead-chart.pdf`)
+  try {
+    if (await exportBeadPdf(store.result, store.palette, store.bead, `${baseName()}-bead-chart.pdf`)) store.status = 'PDF 已导出'
+  } catch (error) {
+    store.status = error instanceof Error ? `PDF 导出失败：${error.message}` : 'PDF 导出失败'
+  }
 }
-function saveCsv(): void {
+async function saveCsv(): Promise<void> {
   if (!store.result) return
-  exportPaletteCsv(store.palette, `${baseName()}-palette.csv`)
+  try {
+    if (await exportPaletteCsv(store.palette, `${baseName()}-palette.csv`)) store.status = '颜色 CSV 已导出'
+  } catch (error) {
+    store.status = error instanceof Error ? `CSV 导出失败：${error.message}` : 'CSV 导出失败'
+  }
 }
 </script>
 

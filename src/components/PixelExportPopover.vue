@@ -36,9 +36,10 @@ async function save(): Promise<void> {
   if (!store.result || exporting.value) return
   exporting.value = true
   try {
-    await exportPng(store.result, filename.value, scale.value)
-    store.status = `PNG 已导出：${finalWidth.value} × ${finalHeight.value}`
-    close()
+    if (await exportPng(store.result, filename.value, scale.value)) {
+      store.status = `PNG 已导出：${finalWidth.value} × ${finalHeight.value}`
+      close()
+    }
   } catch (error) {
     window.alert(error instanceof Error ? error.message : 'PNG 导出失败')
   } finally {
