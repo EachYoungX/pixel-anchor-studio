@@ -134,5 +134,9 @@ export function useIncomingFileRouter() {
     })
   }
 
-  return { notice, dismissNotice, handleIncomingFiles, clearCurrent }
+  function reportError(title: string, detail: string): void {
+    showNotice('error', title, detail)
+  }
+
+  return { notice, dismissNotice, handleIncomingFiles, clearCurrent, reportError }
 }

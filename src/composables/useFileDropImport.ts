@@ -1,10 +1,12 @@
 import { onBeforeUnmount, onMounted, ref, type Ref } from 'vue'
+import { createDesktopDropAuthorization } from '@/domain/file-input/desktop-drop-authorization'
 import { useIncomingFileRouter } from '@/domain/file-input/incoming-file-router'
 import type { IncomingFileNotice } from '@/domain/file-input/incoming-file'
 import { isDesktopPlatform } from '@/platform/platform-detection'
 
 interface FileDropImportState {
   dropActive: Ref<boolean>
+  dropWaiting: Ref<boolean>
   notice: Ref<IncomingFileNotice | null>
   dismissNotice: () => void
 }
@@ -30,13 +32,43 @@ function containsFiles(dataTransfer: DataTransfer | null): boolean {
 
 export function useFileDropImport(): FileDropImportState {
   const dropActive = ref(false)
+  const dropWaiting = ref(false)
   const router = useIncomingFileRouter()
+  const desktopPlatform = isDesktopPlatform()
   let dragDepth = 0
+  let disposed = false
   const desktopUnlisteners: Array<() => void> = []
+
+  const desktopDrop = createDesktopDropAuthorization<DesktopDroppedEntry>({
+    setOverlay(active, waiting) {
+      dropActive.value = active
+      dropWaiting.value = waiting
+      if (!active) dragDepth = 0
+    },
+    handleAuthorized(files) {
+      void router.handleIncomingFiles(files.map((file) => ({
+        name: file.name,
+        path: file.path,
+        isDirectory: file.isDirectory,
+      })), 'desktop-drop')
+    },
+    handleTimeout() {
+      router.reportError('桌面文件拖放处理失败', '请重试或使用“导入图片”或“打开项目”按钮。')
+    },
+  })
 
   function resetDragState(): void {
     dragDepth = 0
     dropActive.value = false
+    dropWaiting.value = false
+  }
+
+  function handleWindowBlur(): void {
+    if (desktopPlatform) {
+      desktopDrop.reset()
+      return
+    }
+    resetDragState()
   }
 
   function handleDragEnter(event: DragEvent): void {
@@ -75,23 +107,38 @@ export function useFileDropImport(): FileDropImportState {
   }
 
   async function registerDesktopDrop(): Promise<void> {
-    const { listen } = await import('@tauri-apps/api/event')
-    desktopUnlisteners.push(await listen<{ active: boolean }>('pas://drag-state', (event) => {
-      dropActive.value = event.payload.active
-      if (!event.payload.active) dragDepth = 0
-    }))
-    desktopUnlisteners.push(await listen<{ files: DesktopDroppedEntry[] }>('pas://files-dropped', (event) => {
-      resetDragState()
-      void router.handleIncomingFiles(event.payload.files.map((file) => ({
-        name: file.name,
-        path: file.path,
-        isDirectory: file.isDirectory,
-      })), 'desktop-drop')
-    }))
+    try {
+      const [{ listen }, { getCurrentWebview }] = await Promise.all([
+        import('@tauri-apps/api/event'),
+        import('@tauri-apps/api/webview'),
+      ])
+      const unlistenAuthorized = await listen<{ files: DesktopDroppedEntry[] }>('pas://files-dropped', (event) => {
+        desktopDrop.handleAuthorized(event.payload.files)
+      })
+      if (disposed) {
+        unlistenAuthorized()
+        return
+      }
+      desktopUnlisteners.push(unlistenAuthorized)
+
+      const unlistenNative = await getCurrentWebview().onDragDropEvent((event) => {
+        desktopDrop.handleNativeDrag(event.payload.type)
+      })
+      if (disposed) {
+        unlistenNative()
+        return
+      }
+      desktopUnlisteners.push(unlistenNative)
+    } catch (error) {
+      desktopDrop.reset()
+      desktopUnlisteners.splice(0).forEach((unlisten) => unlisten())
+      const detail = error instanceof Error && error.message ? error.message : '无法注册桌面拖放监听。'
+      router.reportError('桌面文件拖放初始化失败', detail)
+    }
   }
 
   onMounted(() => {
-    if (isDesktopPlatform()) {
+    if (desktopPlatform) {
       void registerDesktopDrop()
     } else {
       window.addEventListener('dragenter', handleDragEnter)
@@ -100,19 +147,21 @@ export function useFileDropImport(): FileDropImportState {
       window.addEventListener('drop', handleDrop)
       window.addEventListener('dragend', resetDragState)
     }
-    window.addEventListener('blur', resetDragState)
+    window.addEventListener('blur', handleWindowBlur)
   })
 
   onBeforeUnmount(() => {
+    disposed = true
     window.removeEventListener('dragenter', handleDragEnter)
     window.removeEventListener('dragover', handleDragOver)
     window.removeEventListener('dragleave', handleDragLeave)
     window.removeEventListener('drop', handleDrop)
     window.removeEventListener('dragend', resetDragState)
-    window.removeEventListener('blur', resetDragState)
+    window.removeEventListener('blur', handleWindowBlur)
+    desktopDrop.reset()
     desktopUnlisteners.splice(0).forEach((unlisten) => unlisten())
     router.dismissNotice()
   })
 
-  return { dropActive, notice: router.notice, dismissNotice: router.dismissNotice }
+  return { dropActive, dropWaiting, notice: router.notice, dismissNotice: router.dismissNotice }
 }

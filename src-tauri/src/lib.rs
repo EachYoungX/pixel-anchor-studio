@@ -43,11 +43,6 @@ struct DroppedFilesPayload {
     files: Vec<DroppedPathPayload>,
 }
 
-#[derive(Clone, Serialize)]
-struct DragStatePayload {
-    active: bool,
-}
-
 impl DesktopState {
     fn approve_drop_paths(&self, paths: &[PathBuf]) -> Vec<DroppedPathPayload> {
         let mut approved = self.approved_drop_paths.lock();
@@ -121,18 +116,13 @@ pub fn run() {
         .on_webview_event(|webview, event| {
             if let WebviewEvent::DragDrop(drop_event) = event {
                 match drop_event {
-                    tauri::DragDropEvent::Enter { .. } | tauri::DragDropEvent::Over { .. } => {
-                        let _ = webview.emit("pas://drag-state", DragStatePayload { active: true });
-                    }
-                    tauri::DragDropEvent::Leave => {
-                        let _ =
-                            webview.emit("pas://drag-state", DragStatePayload { active: false });
-                    }
                     tauri::DragDropEvent::Drop { paths, .. } => {
                         let files = webview.state::<DesktopState>().approve_drop_paths(paths);
-                        let _ =
-                            webview.emit("pas://drag-state", DragStatePayload { active: false });
-                        let _ = webview.emit("pas://files-dropped", DroppedFilesPayload { files });
+                        if let Err(error) =
+                            webview.emit("pas://files-dropped", DroppedFilesPayload { files })
+                        {
+                            eprintln!("failed to emit authorized dropped files: {error}");
+                        }
                     }
                     _ => {}
                 }
