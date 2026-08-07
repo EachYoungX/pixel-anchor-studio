@@ -1,7 +1,7 @@
 {
   "name": "pixel-anchor-studio",
   "private": true,
-  "version": "0.4.3",
+  "version": "0.5.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,17 +12,31 @@
     "test": "vitest run --exclude tests/e2e/**",
     "test:watch": "vitest",
     "test:bench": "vitest bench",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "desktop:dev": "npm run desktop:sync-version && tauri dev",
+    "desktop:build": "npm run desktop:sync-version && tauri build --no-bundle",
+    "desktop:portable": "npm run desktop:build && node scripts/build-portable.mjs",
+    "desktop:installer": "npm run desktop:sync-version && npm run desktop:manifest && tauri build --bundles nsis --config src-tauri/tauri.install.conf.json && node scripts/collect-installer.mjs",
+    "desktop:release": "npm run check && npm run test:e2e && npm run desktop:portable && npm run desktop:installer && node scripts/generate-checksums.mjs",
+    "desktop:sync-version": "node scripts/sync-desktop-version.mjs",
+    "desktop:manifest": "node scripts/generate-install-manifest.mjs",
+    "desktop:webview2": "node scripts/fetch-webview2-bootstrapper.mjs"
   },
   "dependencies": {
+    "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/plugin-dialog": "^2.7.2",
+    "@tauri-apps/plugin-opener": "^2.5.4",
     "jspdf": "^4.2.1",
     "pinia": "^4.0.2",
     "vue": "^3.5.40"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
+    "@tauri-apps/cli": "^2.11.4",
+    "@types/archiver": "^6.0.3",
     "@types/node": "^24.0.0",
     "@vitejs/plugin-vue": "^6.0.8",
+    "archiver": "^7.0.1",
     "typescript": "^5.9.2",
     "vite": "^8.1.5",
     "vitest": "^4.1.10",
