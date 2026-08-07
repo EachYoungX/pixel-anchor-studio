@@ -75,6 +75,11 @@ function openProjectPicker(): void {
   void fileActions.openProject()
 }
 
+function clearCurrent(): void {
+  projectMenuOpen.value = false
+  void fileActions.clearCurrent()
+}
+
 </script>
 
 <template>
@@ -94,6 +99,8 @@ function openProjectPicker(): void {
           <button ref="firstProjectMenuItem" class="project-menu__item" role="menuitem" type="button" @click="openProjectPicker">打开项目</button>
           <button class="project-menu__item" role="menuitem" type="button" :disabled="!store.source" @click="saveProject">保存项目</button>
           <button class="project-menu__item" role="menuitem" type="button" :disabled="!store.source" @click="projectMenuOpen = false; fileActions.saveProjectAs()">项目另存为</button>
+          <div class="project-menu__separator" role="separator" />
+          <button class="project-menu__item project-menu__item--danger" role="menuitem" type="button" :disabled="!store.source" @click="clearCurrent">清空当前</button>
         </div>
       </div>
       <button class="button" type="button" :disabled="!store.canUndo" :title="`撤销：${store.undoLabel}`" @click="store.undo">撤销</button>
@@ -124,4 +131,6 @@ function openProjectPicker(): void {
 .project-menu__panel { position: absolute; z-index: 12; top: calc(100% + 6px); right: 0; min-width: 132px; padding: 5px; border: 1px solid var(--border); border-radius: 8px; background: #fff; box-shadow: 0 10px 28px rgba(20, 24, 28, 0.14); }
 .project-menu__item { width: 100%; padding: 8px 10px; border: 0; border-radius: 5px; background: transparent; color: var(--text); text-align: left; }
 .project-menu__item:hover:not(:disabled), .project-menu__item:focus-visible { background: var(--surface-muted); }
+.project-menu__separator { height: 1px; margin: 5px 4px; background: var(--border); }
+.project-menu__item--danger { color: var(--danger); }
 </style>

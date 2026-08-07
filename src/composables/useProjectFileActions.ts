@@ -1,11 +1,8 @@
 import { sanitizeFilename } from '@/core/export/download'
-import { encodeProjectFile, parseProjectBytes } from '@/core/export/project'
-import { getPlatformService, type PlatformFile } from '@/platform'
+import { encodeProjectFile } from '@/core/export/project'
+import { useIncomingFileRouter } from '@/domain/file-input/incoming-file-router'
+import { getPlatformService } from '@/platform'
 import { useProjectStore } from '@/stores/project'
-
-function toBrowserFile(file: PlatformFile): File {
-  return new File([new Uint8Array(file.data)], file.name, { type: file.mime })
-}
 
 function errorText(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback
@@ -13,14 +10,17 @@ function errorText(error: unknown, fallback: string): string {
 
 export function useProjectFileActions() {
   const store = useProjectStore()
+  const incoming = useIncomingFileRouter()
 
   async function importImage(): Promise<boolean> {
     try {
       const file = await (await getPlatformService()).importImage()
       if (!file) return false
-      await store.importImage(toBrowserFile(file))
-      await (await getPlatformService()).adoptProjectPath()
-      return true
+      return incoming.handleIncomingFiles([{
+        name: file.name,
+        path: file.path,
+        file: new File([new Uint8Array(file.data)], file.name, { type: file.mime }),
+      }], 'image-picker')
     } catch (error) {
       store.status = `图片导入失败：${errorText(error, '无法读取图片')}`
       return false
@@ -31,9 +31,11 @@ export function useProjectFileActions() {
     try {
       const file = await (await getPlatformService()).openProject()
       if (!file) return false
-      await store.loadSerialized(parseProjectBytes(file.data), file.path)
-      await (await getPlatformService()).adoptProjectPath(file.path)
-      return true
+      return incoming.handleIncomingFiles([{
+        name: file.name,
+        path: file.path,
+        file: new File([new Uint8Array(file.data)], file.name, { type: file.mime }),
+      }], 'project-picker')
     } catch (error) {
       store.status = `项目文件打开失败：${errorText(error, '无法读取项目')}`
       return false
@@ -66,5 +68,6 @@ export function useProjectFileActions() {
     openProject,
     saveProject: () => saveProject(false),
     saveProjectAs: () => saveProject(true),
+    clearCurrent: incoming.clearCurrent,
   }
 }

@@ -11,26 +11,19 @@ import BeadSettingsPanel from '@/components/bead/BeadSettingsPanel.vue'
 import type { WorkspaceMode } from '@/types/project'
 import { useGlobalShortcuts } from '@/composables/useGlobalShortcuts'
 import { useFileDropImport } from '@/composables/useFileDropImport'
-import { parseProjectFile } from '@/core/export/project'
 import DropImportOverlay from '@/components/DropImportOverlay.vue'
 import UnsavedChangesDialog from '@/components/UnsavedChangesDialog.vue'
 import { useDesktopWindowLifecycle } from '@/composables/useDesktopWindowLifecycle'
-import { getPlatformService } from '@/platform'
+import { useProjectFileActions } from '@/composables/useProjectFileActions'
+import { useUnsavedChangesGuard } from '@/composables/useUnsavedChangesGuard'
 
 const store = useProjectStore()
 const workspaceMode = ref<WorkspaceMode>('pixel')
+const fileActions = useProjectFileActions()
+const unsavedGuard = useUnsavedChangesGuard(fileActions.saveProject)
 useGlobalShortcuts()
-const { dropActive, notice: importNotice, dismissNotice } = useFileDropImport({
-  importImage: async (file) => {
-    await store.importImage(file)
-    await (await getPlatformService()).adoptProjectPath()
-  },
-  importProject: async (file, path) => {
-    await store.loadSerialized(await parseProjectFile(file), path)
-    await (await getPlatformService()).adoptProjectPath(path)
-  },
-})
-const windowLifecycle = useDesktopWindowLifecycle()
+const { dropActive, notice: importNotice, dismissNotice } = useFileDropImport()
+useDesktopWindowLifecycle()
 </script>
 
 <template>
@@ -80,11 +73,12 @@ const windowLifecycle = useDesktopWindowLifecycle()
     </footer>
     <DropImportOverlay :active="dropActive" />
     <UnsavedChangesDialog
-      :open="windowLifecycle.closePromptOpen.value"
-      :saving="windowLifecycle.savingBeforeClose.value"
-      @save="windowLifecycle.saveAndExit"
-      @discard="windowLifecycle.discardAndExit"
-      @cancel="windowLifecycle.cancelClose"
+      :open="unsavedGuard.open.value"
+      :saving="unsavedGuard.saving.value"
+      :reason="unsavedGuard.reason.value"
+      @save="unsavedGuard.saveAndContinue"
+      @discard="unsavedGuard.discardAndContinue"
+      @cancel="unsavedGuard.cancel"
     />
     <Transition name="import-notice">
       <aside

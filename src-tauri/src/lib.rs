@@ -11,7 +11,7 @@ use parking_lot::Mutex;
 use serde::Serialize;
 use std::collections::HashSet;
 use std::path::PathBuf;
-use tauri::{Manager, WebviewEvent};
+use tauri::{Emitter, Manager, WebviewEvent};
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -30,14 +30,44 @@ pub struct DesktopState {
     current_project_path: Mutex<Option<PathBuf>>,
 }
 
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DroppedPathPayload {
+    name: String,
+    path: String,
+    is_directory: bool,
+}
+
+#[derive(Clone, Serialize)]
+struct DroppedFilesPayload {
+    files: Vec<DroppedPathPayload>,
+}
+
+#[derive(Clone, Serialize)]
+struct DragStatePayload {
+    active: bool,
+}
+
 impl DesktopState {
-    fn approve_drop_paths(&self, paths: &[PathBuf]) {
+    fn approve_drop_paths(&self, paths: &[PathBuf]) -> Vec<DroppedPathPayload> {
         let mut approved = self.approved_drop_paths.lock();
+        approved.clear();
+        let mut payloads = Vec::new();
         for path in paths {
             if let Ok(canonical) = path.canonicalize() {
+                payloads.push(DroppedPathPayload {
+                    name: canonical
+                        .file_name()
+                        .and_then(|value| value.to_str())
+                        .unwrap_or("file")
+                        .to_string(),
+                    path: canonical.to_string_lossy().into_owned(),
+                    is_directory: canonical.is_dir(),
+                });
                 approved.insert(canonical);
             }
         }
+        payloads
     }
 }
 
@@ -89,8 +119,23 @@ pub fn run() {
         })
         .on_window_event(move |window, event| event_window_state.handle(window, event))
         .on_webview_event(|webview, event| {
-            if let WebviewEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) = event {
-                webview.state::<DesktopState>().approve_drop_paths(paths);
+            if let WebviewEvent::DragDrop(drop_event) = event {
+                match drop_event {
+                    tauri::DragDropEvent::Enter { .. } | tauri::DragDropEvent::Over { .. } => {
+                        let _ = webview.emit("pas://drag-state", DragStatePayload { active: true });
+                    }
+                    tauri::DragDropEvent::Leave => {
+                        let _ =
+                            webview.emit("pas://drag-state", DragStatePayload { active: false });
+                    }
+                    tauri::DragDropEvent::Drop { paths, .. } => {
+                        let files = webview.state::<DesktopState>().approve_drop_paths(paths);
+                        let _ =
+                            webview.emit("pas://drag-state", DragStatePayload { active: false });
+                        let _ = webview.emit("pas://files-dropped", DroppedFilesPayload { files });
+                    }
+                    _ => {}
+                }
             }
         })
         .invoke_handler(tauri::generate_handler![

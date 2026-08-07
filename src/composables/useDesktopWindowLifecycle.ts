@@ -1,14 +1,12 @@
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useProjectFileActions } from '@/composables/useProjectFileActions'
+import { computed, onBeforeUnmount, onMounted, watch } from 'vue'
+import { useUnsavedChangesGuard } from '@/composables/useUnsavedChangesGuard'
 import { getPlatformService } from '@/platform'
 import { isDesktopPlatform } from '@/platform/platform-detection'
 import { useProjectStore } from '@/stores/project'
 
 export function useDesktopWindowLifecycle() {
   const store = useProjectStore()
-  const fileActions = useProjectFileActions()
-  const closePromptOpen = ref(false)
-  const savingBeforeClose = ref(false)
+  const guard = useUnsavedChangesGuard()
   let unlistenClose: (() => void) | undefined
 
   const documentName = computed(() => {
@@ -23,25 +21,11 @@ export function useDesktopWindowLifecycle() {
     await (await getPlatformService()).setWindowTitle(title)
   }
 
-  async function destroyWindow(): Promise<void> {
-    if (!isDesktopPlatform()) return
+  async function destroyWindow(): Promise<boolean> {
+    if (!isDesktopPlatform()) return false
     const { getCurrentWindow } = await import('@tauri-apps/api/window')
     await getCurrentWindow().destroy()
-  }
-
-  async function saveAndExit(): Promise<void> {
-    savingBeforeClose.value = true
-    try {
-      if (await fileActions.saveProject()) await destroyWindow()
-    } finally {
-      savingBeforeClose.value = false
-    }
-  }
-
-  async function discardAndExit(): Promise<void> {
-    store.abandonChanges()
-    closePromptOpen.value = false
-    await destroyWindow()
+    return true
   }
 
   onMounted(async () => {
@@ -50,18 +34,12 @@ export function useDesktopWindowLifecycle() {
     unlistenClose = await getCurrentWindow().onCloseRequested((event) => {
       if (!store.dirty) return
       event.preventDefault()
-      closePromptOpen.value = true
+      void guard.request('close', destroyWindow)
     })
   })
 
   onBeforeUnmount(() => unlistenClose?.())
   watch([() => store.dirty, () => store.currentProjectPath, () => store.source?.name], () => void updateTitle(), { immediate: true })
 
-  return {
-    closePromptOpen,
-    savingBeforeClose,
-    saveAndExit,
-    discardAndExit,
-    cancelClose: () => { closePromptOpen.value = false },
-  }
+  return { destroyWindow }
 }

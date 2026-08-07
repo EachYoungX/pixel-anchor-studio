@@ -73,6 +73,12 @@ async function chooseProject(page: Page, file: { name: string; mimeType: string;
   await (await chooser).setFiles(file)
 }
 
+async function discardUnsavedChanges(page: Page, detail: string): Promise<void> {
+  const dialog = page.getByRole('dialog', { name: '保存当前修改？' })
+  await expect(dialog).toContainText(detail)
+  await dialog.getByRole('button', { name: '不保存' }).click()
+}
+
 interface BrowserDropFile {
   name: string
   mimeType: string
@@ -105,9 +111,9 @@ test('shows passive drop feedback and applies safe multi-file import rules', asy
   const secondImage = { name: 'second-drop.png', mimeType: 'image/png', buffer: createSmokePng(20, 20) }
 
   await dispatchFileDrag(page, 'dragenter', [firstImage])
-  const overlay = page.getByRole('status', { name: '拖放图片导入' })
+  const overlay = page.getByRole('status', { name: '拖放文件导入' })
   await expect(overlay).toBeVisible()
-  await expect(overlay.getByText('图片拖放到此处即可导入')).toBeVisible()
+  await expect(overlay.getByText('释放鼠标以导入图片')).toBeVisible()
   await expect(overlay.getByText(/PNG、JPEG、WebP、GIF、AVIF、BMP、SVG/)).toBeVisible()
   await expect(overlay.getByText(/文件仅在本地处理/)).toBeVisible()
   await expect(overlay).toHaveCSS('pointer-events', 'none')
@@ -115,7 +121,7 @@ test('shows passive drop feedback and applies safe multi-file import rules', asy
   await dispatchFileDrag(page, 'drop', [firstImage, secondImage])
   await expect(overlay).toBeHidden()
   await expect(page.getByText('first-drop.png · 40 × 24', { exact: true })).toBeVisible()
-  await expect(page.getByText(/已忽略另外 1 个文件/)).toBeVisible()
+  await expect(page.getByText(/另外 1 个文件未处理/)).toBeVisible()
 
   await dispatchFileDrag(page, 'drop', [{ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('not an image') }])
   const unsupportedNotice = page.getByRole('alert')
@@ -125,6 +131,7 @@ test('shows passive drop feedback and applies safe multi-file import rules', asy
   await expect(page.getByText('first-drop.png · 40 × 24', { exact: true })).toBeVisible()
 
   await dispatchFileDrag(page, 'drop', [{ name: 'broken-drop.png', mimeType: 'image/png', buffer: Buffer.from('not an image') }])
+  await discardUnsavedChanges(page, '导入新图片将替换当前工作内容。')
   const failedImageNotice = page.getByRole('alert').filter({ hasText: 'broken-drop.png' })
   await expect(failedImageNotice).toContainText('无法解码图片')
   await expect(failedImageNotice).toContainText('当前项目未受影响')
@@ -135,8 +142,31 @@ test('shows passive drop feedback and applies safe multi-file import rules', asy
     { name: 'mixed.pixel-anchor.json', mimeType: 'application/json', buffer: Buffer.from('{}') },
     secondImage,
   ])
-  await expect(page.getByRole('alert').filter({ hasText: 'mixed.pixel-anchor.json' })).toContainText('项目文件不能与图片或其他文件混合拖入')
+  await expect(page.getByRole('alert').filter({ hasText: 'mixed.pixel-anchor.json' })).toContainText('项目文件需要单独拖入')
   await expect(page.getByText('first-drop.png · 40 × 24', { exact: true })).toBeVisible()
+})
+
+test('guards clearing the current project and preserves it on cancel', async ({ page }) => {
+  await openWorkbench(page)
+  await chooseImage(page, {
+    name: 'clear-guard.png',
+    mimeType: 'image/png',
+    buffer: createSmokePng(24, 18),
+  })
+  await expect(page.getByText('clear-guard.png · 24 × 18', { exact: true })).toBeVisible()
+
+  await page.getByRole('button', { name: '项目' }).click()
+  await page.getByRole('menuitem', { name: '清空当前' }).click()
+  const dialog = page.getByRole('dialog', { name: '保存当前修改？' })
+  await expect(dialog).toContainText('清空后这些修改将无法恢复。')
+  await dialog.getByRole('button', { name: '取消' }).click()
+  await expect(page.getByText('clear-guard.png · 24 × 18', { exact: true })).toBeVisible()
+
+  await page.getByRole('button', { name: '项目' }).click()
+  await page.getByRole('menuitem', { name: '清空当前' }).click()
+  await discardUnsavedChanges(page, '清空后这些修改将无法恢复。')
+  await expect(page.getByText('clear-guard.png · 24 × 18', { exact: true })).toBeHidden()
+  await expect(page.getByText('未导入图片', { exact: true })).toBeVisible()
 })
 
 test('imports, processes, edits, and keeps both canvas viewports aligned', async ({ page }) => {
@@ -425,7 +455,8 @@ test('keeps document scrolling and completes crop, project, and bead export flow
     mimeType: 'image/png',
     buffer: Buffer.from('not-an-image'),
   })
-  await expect(page.getByText(/图片导入失败：无法解码图片/)).toBeVisible()
+  await discardUnsavedChanges(page, '导入新图片将替换当前工作内容。')
+  await expect(page.getByRole('alert').filter({ hasText: 'broken.png' })).toContainText('无法解码图片')
   await expect(page.getByText('v040-roundtrip.png · 48 × 32', { exact: true })).toBeVisible()
   await expect(page.getByText(/输出 32 × 32/)).toBeVisible()
   await expect(page.getByRole('button', { name: '撤销' })).toBeEnabled()
@@ -454,7 +485,8 @@ test('keeps document scrolling and completes crop, project, and bead export flow
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify(corruptedProject)),
   })
-  await expect(page.getByText(/项目文件打开失败：无法解码图片/)).toBeVisible()
+  await discardUnsavedChanges(page, '打开其他项目将替换当前工作内容。')
+  await expect(page.getByRole('alert').filter({ hasText: 'broken.pixel-anchor.json' })).toContainText('无法解码图片')
   await expect(page.getByText('v040-roundtrip.png · 48 × 32', { exact: true })).toBeVisible()
   await expect(page.getByText(/输出 32 × 32/)).toBeVisible()
   await expect(page.getByRole('button', { name: '撤销' })).toBeEnabled()
@@ -465,6 +497,7 @@ test('keeps document scrolling and completes crop, project, and bead export flow
     mimeType: 'application/json',
     buffer: savedProject,
   })
+  await discardUnsavedChanges(page, '打开其他项目将替换当前工作内容。')
   await expect(page.getByText('项目已打开', { exact: true })).toBeVisible()
 
   await page.getByRole('button', { name: '拼豆图导出' }).click()

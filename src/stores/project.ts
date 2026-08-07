@@ -101,6 +101,32 @@ export const useProjectStore = defineStore('project', () => {
     status.value = '已释放当前图片'
   }
 
+  function clearCurrent(): void {
+    suppressDirty = true
+    try {
+      latestSourceLoadId += 1
+      editorSession.end()
+      adoptSource(null)
+      result.value = null
+      notifyResultChanged()
+      Object.assign(crop, { x: 0, y: 0, width: 1, height: 1 })
+      cropSettings.mode = 'custom'
+      Object.assign(anchor, { x: 0, y: 0, width: 32, height: 32 })
+      palette.value = []
+      colorCodes.value = {}
+      history.value = []
+      future.value = []
+      pixelEditDirtyBounds.value = null
+      selectedColor.value = '#202124'
+      editTarget.value = 'crop'
+      currentProjectPath.value = undefined
+      status.value = '当前内容已清空'
+    } finally {
+      suppressDirty = false
+      dirty.value = false
+    }
+  }
+
   const effectiveCrop = computed<Rect>(() => {
     if (!source.value) return crop
     if (cropSettings.mode === 'full') return fullSourceRect(source.value.width, source.value.height)
@@ -538,5 +564,6 @@ export const useProjectStore = defineStore('project', () => {
     abandonChanges,
     refreshPalette,
     releaseCurrentSource,
+    clearCurrent,
   }
 })

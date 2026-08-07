@@ -6,13 +6,13 @@ defineProps<{ active: boolean }>()
 
 <template>
   <Transition name="drop-overlay">
-    <div v-if="active" class="drop-import-overlay" role="status" aria-live="polite" aria-label="拖放图片导入">
+    <div v-if="active" class="drop-import-overlay" role="status" aria-live="polite" aria-label="拖放文件导入">
       <div class="drop-import-prompt">
         <svg class="drop-import-icon" viewBox="0 0 64 64" aria-hidden="true">
           <path d="M15 41v7a5 5 0 0 0 5 5h24a5 5 0 0 0 5-5v-7M32 11v30m0-30L21 22m11-11 11 11" />
         </svg>
-        <strong>图片拖放到此处即可导入</strong>
-        <span>支持 {{ SUPPORTED_IMAGE_TYPES_TEXT }} · 文件仅在本地处理</span>
+        <strong>释放鼠标以导入图片</strong>
+        <span>支持 {{ SUPPORTED_IMAGE_TYPES_TEXT }} 等图片<br />也可以拖入 Pixel Anchor Studio 项目文件 · 文件仅在本地处理</span>
       </div>
     </div>
   </Transition>

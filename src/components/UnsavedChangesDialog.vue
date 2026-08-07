@@ -1,6 +1,16 @@
 <script setup lang="ts">
-defineProps<{ open: boolean; saving: boolean }>()
+import { computed } from 'vue'
+import type { UnsavedChangesReason } from '@/composables/useUnsavedChangesGuard'
+
+const props = defineProps<{ open: boolean; saving: boolean; reason: UnsavedChangesReason }>()
 defineEmits<{ save: []; discard: []; cancel: [] }>()
+
+const detail = computed(() => ({
+  close: '退出后这些修改将无法恢复。',
+  'import-image': '导入新图片将替换当前工作内容。',
+  'open-project': '打开其他项目将替换当前工作内容。',
+  clear: '清空后这些修改将无法恢复。',
+})[props.reason])
 </script>
 
 <template>
@@ -8,11 +18,11 @@ defineEmits<{ save: []; discard: []; cancel: [] }>()
     <div v-if="open" class="unsaved-backdrop" role="presentation">
       <section class="unsaved-dialog" role="dialog" aria-modal="true" aria-labelledby="unsaved-title">
         <header><h2 id="unsaved-title">保存当前修改？</h2></header>
-        <p>当前项目包含尚未保存的修改。退出后，这些修改将无法恢复。</p>
+        <p>当前内容包含尚未保存的修改。<br />{{ detail }}</p>
         <footer>
           <button class="button" type="button" :disabled="saving" @click="$emit('cancel')">取消</button>
-          <button class="button button-danger" type="button" :disabled="saving" @click="$emit('discard')">不保存并退出</button>
-          <button class="button button-primary" type="button" :disabled="saving" @click="$emit('save')">{{ saving ? '正在保存…' : '保存并退出' }}</button>
+          <button class="button button-danger" type="button" :disabled="saving" @click="$emit('discard')">不保存</button>
+          <button class="button button-primary" type="button" :disabled="saving" @click="$emit('save')">{{ saving ? '正在保存…' : '保存' }}</button>
         </footer>
       </section>
     </div>
