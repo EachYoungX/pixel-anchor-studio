@@ -26,6 +26,7 @@ pub struct AppEnvironment {
 pub struct DesktopState {
     environment: AppEnvironment,
     approved_drop_paths: Mutex<HashSet<PathBuf>>,
+    pending_authorized_drop: Mutex<Option<Vec<DroppedPathPayload>>>,
     pending_project_paths: Mutex<HashSet<PathBuf>>,
     current_project_path: Mutex<Option<PathBuf>>,
 }
@@ -62,13 +63,25 @@ impl DesktopState {
                 approved.insert(canonical);
             }
         }
+        *self.pending_authorized_drop.lock() = Some(payloads.clone());
         payloads
+    }
+
+    fn take_authorized_drop(&self) -> Option<Vec<DroppedPathPayload>> {
+        self.pending_authorized_drop.lock().take()
     }
 }
 
 #[tauri::command]
 fn get_app_environment(state: tauri::State<'_, DesktopState>) -> AppEnvironment {
     state.environment.clone()
+}
+
+#[tauri::command]
+fn claim_authorized_drop(state: tauri::State<'_, DesktopState>) -> Option<DroppedFilesPayload> {
+    state
+        .take_authorized_drop()
+        .map(|files| DroppedFilesPayload { files })
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -93,6 +106,7 @@ pub fn run() {
     let state = DesktopState {
         environment,
         approved_drop_paths: Mutex::new(HashSet::new()),
+        pending_authorized_drop: Mutex::new(None),
         pending_project_paths: Mutex::new(HashSet::new()),
         current_project_path: Mutex::new(None),
     };
@@ -130,6 +144,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_app_environment,
+            claim_authorized_drop,
             file_commands::pick_image,
             file_commands::open_project,
             file_commands::read_dropped_file,
@@ -138,4 +153,42 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running Pixel Anchor Studio");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_state() -> DesktopState {
+        DesktopState {
+            environment: AppEnvironment {
+                platform: "desktop",
+                mode: AppMode::Installed,
+                data_directory: String::new(),
+                version: String::new(),
+                webview2_version: String::new(),
+            },
+            approved_drop_paths: Mutex::new(HashSet::new()),
+            pending_authorized_drop: Mutex::new(None),
+            pending_project_paths: Mutex::new(HashSet::new()),
+            current_project_path: Mutex::new(None),
+        }
+    }
+
+    #[test]
+    fn authorized_drop_batch_can_only_be_claimed_once() {
+        let directory = tempfile::tempdir().unwrap();
+        let dropped = directory.path().join("drop.png");
+        std::fs::write(&dropped, b"drop").unwrap();
+        let canonical = dropped.canonicalize().unwrap();
+        let state = test_state();
+
+        state.approve_drop_paths(std::slice::from_ref(&dropped));
+
+        let claimed = state.take_authorized_drop().unwrap();
+        assert_eq!(claimed.len(), 1);
+        assert_eq!(claimed[0].path, canonical.to_string_lossy());
+        assert!(state.approved_drop_paths.lock().contains(&canonical));
+        assert!(state.take_authorized_drop().is_none());
+    }
 }

@@ -128,6 +128,11 @@ test('shows passive drop feedback and applies safe multi-file import rules', asy
   await expect(unsupportedNotice).toContainText('notes.txt')
   await expect(unsupportedNotice).toContainText('文件类型不受支持')
   await expect(unsupportedNotice).toContainText('支持类型')
+  const noticeBox = await unsupportedNotice.boundingBox()
+  const closeBox = await unsupportedNotice.getByRole('button', { name: '关闭导入提示' }).boundingBox()
+  expect(noticeBox).not.toBeNull()
+  expect(closeBox).not.toBeNull()
+  expect(closeBox!.x).toBeGreaterThan(noticeBox!.x + noticeBox!.width * 0.8)
   await expect(page.getByText('first-drop.png · 40 × 24', { exact: true })).toBeVisible()
 
   await dispatchFileDrag(page, 'drop', [{ name: 'broken-drop.png', mimeType: 'image/png', buffer: Buffer.from('not an image') }])

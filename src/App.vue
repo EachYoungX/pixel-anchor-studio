@@ -120,10 +120,10 @@ useDesktopWindowLifecycle()
   box-shadow: 0 16px 40px rgba(20, 24, 28, 0.18);
 }
 .import-notice--error { border-color: #dfb7b7; border-left-color: var(--danger); background: #fffafa; }
-.import-notice > div { min-width: 0; display: grid; gap: 4px; }
+.import-notice > div { flex: 1 1 auto; min-width: 0; display: grid; gap: 4px; }
 .import-notice strong { overflow-wrap: anywhere; font-size: 14px; }
 .import-notice p { overflow-wrap: anywhere; font-size: 12px; }
-.import-notice button { flex: none; width: 28px; height: 28px; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: 21px; line-height: 1; }
+.import-notice button { flex: none; align-self: flex-start; margin-left: auto; width: 28px; height: 28px; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: 21px; line-height: 1; }
 .import-notice-enter-active, .import-notice-leave-active { transition: opacity 140ms ease, transform 140ms ease; }
 .import-notice-enter-from, .import-notice-leave-to { opacity: 0; transform: translateY(8px); }
 
