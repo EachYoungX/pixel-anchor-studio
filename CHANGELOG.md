@@ -4,8 +4,8 @@
 
 ### 桌面安装
 
-- 统一 Windows 程序目录为 `PixelAnchorStudio`，并将安装版应用数据统一存放到 `PixelAnchorStudio\data`；
-- 改进安装位置和可编辑的数据位置选择，支持快速使用默认位置或安装位置；
+- 安装版程序固定到 `%LOCALAPPDATA%\Programs\PixelAnchorStudio`，应用数据固定到 `%LOCALAPPDATA%\PixelAnchorStudio\data`，不再提供自定义路径；
+- 精简安装流程，仅保留许可证、快捷方式选项及必要的安装/维护页面，并明确推荐使用便携版；
 - 桌面快捷方式改为默认不创建，卸载时默认清理经所有权确认的应用数据并保留未知用户文件。
 
 ### 文件操作
@@ -22,6 +22,7 @@
 ### 开发与发布
 
 - 日常 Push 不再自动生成 Windows 包；新增手动 `Desktop Build` 工作流，用于按需生成安装版与便携版测试包。
+- 明确以 `package.json` 为版本源，并补充“验证候选提交、Tag 同一 SHA、从 Tag 构建 Draft Release”的正式发布流程。
 
 ## 0.5.0 - 2026-08-07
 

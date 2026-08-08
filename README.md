@@ -6,9 +6,7 @@ Pixel Anchor Studio 面向普通图片、插画、二次元图片、AI 生成的
 
 图片处理默认只在当前设备中完成，不需要上传到服务器。
 
-> 当前桌面版本：v0.5.1  
 > 支持平台：Windows 10 / 11 x64  
-> 同时保留浏览器版本与 Windows 桌面版本。
 
 ---
 
@@ -169,18 +167,24 @@ PDF 使用 ASCII 定位文本，避免不同系统字体造成中文乱码。
 
 目前仅提供两种 Windows x64 发行形式。
 
-## 安装版
+> **推荐使用便携版。** 便携版无需安装、目录和数据位置清晰，也更容易迁移与备份。安装版仅适合希望使用标准 Windows 安装/卸载入口和快捷方式管理的用户。
+
+## 安装版（不推荐）
 
 - 当前用户安装；
-- 可以修改应用安装位置；
-- 可以修改应用数据位置；
-- 默认应用数据目录：
+- 不提供自定义安装路径；
+- 应用固定安装到：
+
+```text
+%LOCALAPPDATA%\Programs\PixelAnchorStudio
+```
+
+- 应用设置、缓存和恢复数据固定保存到：
 
 ```text
 %LOCALAPPDATA%\PixelAnchorStudio\data
 ```
 
-- 可以将数据放在安装目录的 `data` 子目录；
 - 默认创建开始菜单快捷方式；
 - 桌面快捷方式默认不创建，可在安装时勾选；
 - 卸载时默认清理经过所有权确认的应用设置、缓存和恢复数据；
@@ -188,7 +192,7 @@ PDF 使用 ASCII 定位文本，避免不同系统字体造成中文乱码。
 
 如果用户将项目、PNG、PDF 等个人文件放在安装目录中，卸载器会保留这些未知文件，并保留非空目录。
 
-## 便携版
+## 便携版（推荐）
 
 目录名称：
 
@@ -236,8 +240,8 @@ WebView2 已经存在时，核心图片处理、项目读写和导出功能均�
 PowerShell 校验示例：
 
 ```powershell
-Get-FileHash .\PixelAnchorStudio-0.5.1-Setup.exe -Algorithm SHA256
-Get-FileHash .\PixelAnchorStudio-0.5.1-Portable.zip -Algorithm SHA256
+Get-FileHash .\PixelAnchorStudio-*-Setup.exe -Algorithm SHA256
+Get-FileHash .\PixelAnchorStudio-*-Portable.zip -Algorithm SHA256
 ```
 
 确认来源和 SHA-256 无误后，可在 SmartScreen 中点击“更多信息”，检查应用名称，再点击“仍要运行”。不要关闭 SmartScreen。
@@ -419,6 +423,8 @@ npm run desktop:release
 ```
 
 Windows 发行包建议通过仓库提供 GitHub Actions Windows Runner 进行按需构建。
+
+版本号、测试包与正式 Release 的维护方法见[内部打包与发布指南](docs/PixelAnchorStudio-INTERNAL-PACKAGING-GUIDE.md)。
 
 ---
 

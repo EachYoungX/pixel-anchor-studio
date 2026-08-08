@@ -1,501 +1,483 @@
-# Pixel Anchor Studio 打包与发布指南
+# Pixel Anchor Studio 内部打包与发布指南
+
+本文说明 Windows 测试包、正式版本号和 GitHub Release 的当前操作方式。命令默认在仓库根目录执行。
 
 ---
 
-# 一、项目的三个流程
+## 一、先记住四个结论
 
-项目现在有三条不同的链路：
+1. 普通 Push 只运行 CI，不生成 Windows 安装包。
+2. `Desktop Build` 只手动运行，用来生成指定提交的 Windows 测试包。
+3. 正式发布前必须先验证一个确定的提交；通过后只能给这个提交打 Tag。
+4. 当前仓库没有 `.github/workflows/release.yml`，正式 Release 需要从 Tag 重新构建并手动建立 Draft Release。
+
+---
+
+## 二、发行形式与推荐顺序
+
+### 便携版（推荐）
+
+文件名：
+
+```text
+PixelAnchorStudio-<version>-Portable.zip
+```
+
+解压后的应用目录为：
+
+```text
+PixelAnchorStudio-Portable
+```
+
+数据固定保存在便携目录内：
+
+```text
+PixelAnchorStudio-Portable\data
+```
+
+便携版无需安装，迁移和备份更直观，因此面向用户时应优先推荐便携版。
+
+### 安装版（不推荐）
+
+文件名：
+
+```text
+PixelAnchorStudio-<version>-Setup.exe
+```
+
+安装版不提供程序路径或数据路径选择。目录固定为：
+
+```text
+程序：%LOCALAPPDATA%\Programs\PixelAnchorStudio
+数据：%LOCALAPPDATA%\PixelAnchorStudio\data
+```
+
+安装器页面只保留欢迎/许可证、已有版本维护（仅检测到旧版本时出现）、开始菜单与桌面快捷方式选项、安装进度和完成页。WebView2 缺失时由安装过程自动运行随包提供的官方 Bootstrapper，不再单独显示路径、数据或 WebView2 配置页。
+
+安装版仅适合希望使用 Windows“已安装的应用”、标准卸载入口和快捷方式管理的用户。README、Release Notes 和下载说明都应明确“不建议安装版，推荐便携版”。
+
+---
+
+## 三、版本号依赖什么
+
+### 唯一人工版本源
+
+根目录 [`package.json`](../package.json) 的 `version` 是发布版本号的人工源头。
+
+以下产物名称都直接读取它：
+
+```text
+scripts/build-portable.mjs
+→ PixelAnchorStudio-<version>-Portable.zip
+
+scripts/collect-installer.mjs
+→ PixelAnchorStudio-<version>-Setup.exe
+```
+
+`scripts/sync-desktop-version.mjs` 会在桌面构建前把同一版本同步到：
+
+```text
+src-tauri/tauri.conf.json
+src-tauri/Cargo.toml
+```
+
+`desktop:build`、`desktop:portable` 和 `desktop:installer` 都会调用同步脚本。因此不需要每次手工修改多个桌面配置文件。
+
+### 发布新版本时怎么改
+
+在干净工作区中只执行一次：
+
+```bash
+npm version 1.0.0 --no-git-tag-version
+npm run desktop:sync-version
+cargo check --manifest-path src-tauri/Cargo.toml
+```
+
+第一条命令同时修改：
+
+```text
+package.json
+package-lock.json
+```
+
+第二条命令同步 Tauri 和 Cargo 包版本；第三条命令校验 Rust 工程并让 `Cargo.lock` 与包版本保持一致。
+
+然后检查实际变更：
+
+```bash
+git diff -- package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock
+```
+
+不要只手改生成出来的 Setup 或 Portable 文件名，也不要只改 `tauri.conf.json`。下一次脚本运行会重新以 `package.json` 为准。
+
+版本提交还应同时更新：
+
+```text
+CHANGELOG.md
+README.md 中确实需要随版本变化的内容
+Release Notes 草稿
+```
+
+版本号修改会产生新提交。即使代码内容没有变化，也必须对这个最终版本提交重新运行 CI 和候选包验证，不能把旧版本号提交的测试结果直接当成正式版本结果。
+
+---
+
+## 四、三条自动化链路
 
 ```text
 日常开发 Push
       ↓
       CI
 
-需要桌面测试
+需要 Windows 实机验证
       ↓
 手动 Desktop Build
       ↓
-   Artifact
+短期 Artifact
 
 正式版本
       ↓
-正式 Release 流程
+候选提交验证通过
+      ↓
+Tag 同一提交
+      ↓
+从 Tag 重新构建
+      ↓
+Draft Release → 抽检 → Publish
 ```
 
-当前仓库已经实现前两条。
+### CI
 
-正式Tag自动创建Draft Release的第三条链路，计划在v1.0.0正式发布前加入。
-
----
-
-# 二、CI什么时候运行
-
-当前：
+文件：
 
 ```text
 .github/workflows/ci.yml
 ```
 
-触发条件：
-
-```yaml
-on:
-  push:
-  pull_request:
-```
-
-因此：
-
-> CI会在普通Push和Pull Request事件中自动运行。
-
-当前CI包含：
+触发：
 
 ```text
-check
-e2e
+push
+pull_request
 ```
 
-其中：
+执行：
 
 ```text
-check
-→ npm run check
-→ typecheck + unit test + Web production build
+npm run check
+npm run test:e2e
 ```
 
-以及：
+CI 不生成 Setup、Portable 或 GitHub Release。
 
-```text
-e2e
-→ Playwright
-```
+### Desktop Build
 
-CI内部虽然会临时生成Web构建结果，但这些只存在于GitHub Runner的临时环境中。
-
-CI不会生成Windows Setup.exe和Portable.zip，也不会上传桌面发行Artifact以及创建GitHub Release。
-
----
-
-# 三、什么时候Push
-
-通常以下工作只需要：
-
-```text
-Commit
-→ Push
-→ 等CI
-```
-
-例如：
-
-- Vue界面修改；
-- 样式修改；
-- Web逻辑修改；
-- 像素算法修复；
-- 单元测试；
-- README；
-- CHANGELOG；
-- 普通重构；
-- 不涉及Windows原生行为的Bug。
-
-执行操作：
-
-```bash
-git add .
-git commit -m "..."
-git push
-```
-
-确认`check`以及`e2e`通过即可
-```
-
-正常Push之后不应自动出现新的Desktop Build运行。
-
----
-
-# 五、什么时候需要手动桌面打包
-
-以下修改应手动运行Desktop Build：
-
-- 修改`src-tauri`；
-- 修改Rust代码；
-- 修改WebView2检测；
-- 修改原生拖放；
-- 修改安装版数据目录；
-- 修改NSIS；
-- 修改卸载逻辑；
-- 修改便携版构建脚本；
-- 修改Windows原生文件选择与保存；
-- 修改窗口状态；
-- 修改单实例；
-- 修改桌面快捷键；
-- 修改Tauri权限；
-- 修改安装文件清单；
-- 准备阶段性Windows测试；
-- 准备正式发布候选版本。
-
-普通前端小修改不需要每次生成Windows包。
-
----
-
-# 六、如何手动生成测试包
-
-当前工作流：
+文件：
 
 ```text
 .github/workflows/desktop-build.yml
 ```
 
-只有：
-
-```yaml
-on:
-  workflow_dispatch:
-```
-
-因此只能手动触发。
-
-## GitHub网页步骤
-
-1. 打开项目GitHub仓库；
-2. 点击顶部`Actions`；
-3. 左侧选择`Desktop Build`；
-4. 点击右侧`Run workflow`；
-5. 在Branch下拉框选择要构建的分支，通常为：
+只支持手动 `workflow_dispatch`，使用 GitHub 托管的 `windows-latest` Runner，依次执行：
 
 ```text
-main
+npm ci
+npm run check
+Playwright E2E
+WebView2 Bootstrapper 下载与校验
+便携版构建
+NSIS 安装版构建
+SHA256SUMS.txt 生成
+Artifact 上传
 ```
 
-6. 点击绿色`Run workflow`；
-7. 等待新的运行记录出现；
-8. 打开运行记录；
-9. 等待：
-
-```text
-windows-x64
-```
-
-变为绿色；
-10. 滚动到页面底部的`Artifacts`；
-11. 下载：
+Artifact 名称包含提交 SHA：
 
 ```text
 PixelAnchorStudio-<commit-sha>-windows-x64
 ```
 
-Artifact解压后应包含：
-
-```text
-PixelAnchorStudio-0.5.1-Portable.zip
-PixelAnchorStudio-0.5.1-Setup.exe
-SHA256SUMS.txt
-```
-
-当前Artifact保留14天。
+默认保留 14 天，不会自动创建 Release。
 
 ---
 
-# 七、手动Build实际执行什么
+## 五、什么时候需要 Desktop Build
 
-Desktop Build使用：
+以下情况应生成 Windows 测试包：
 
-```text
-windows-latest
-```
+- 修改 `src-tauri`、Rust、Tauri 权限或原生窗口行为；
+- 修改拖放、系统文件打开/保存、单实例或窗口状态；
+- 修改 NSIS、安装/卸载逻辑或固定目录；
+- 修改便携版、安装清单、WebView2 或校验和脚本；
+- 准备阶段性 Windows 测试；
+- 准备 Beta、RC 或正式发布候选提交。
 
-GitHub托管Runner。
-
-依次执行：
-
-```text
-Node.js 22
-Rust stable
-x86_64-pc-windows-msvc
-npm ci
-npm run check
-Playwright E2E
-WebView2 Bootstrapper下载与校验
-便携版构建
-NSIS安装版构建
-SHA256SUMS生成
-Artifact上传
-```
-
-Windows发行包交给GitHub Runner。
+普通文案、Web 样式或纯前端小修改通常只需等待 CI；但若它们将进入正式版本，最终候选提交仍需生成完整 Windows 包测试。
 
 ---
 
-# 十一、校验SHA-256
+## 六、如何生成并验证候选包
 
-下载Artifact后读取：
+### 1. 固定候选提交
+
+先 Push，等待该提交的 CI 全绿，然后记录完整 SHA：
+
+```bash
+git rev-parse HEAD
+```
+
+测试记录中必须保存这个 SHA。不要只写“最新 main”。
+
+### 2. 手动运行 Desktop Build
+
+网页操作：
 
 ```text
+GitHub → Actions → Desktop Build → Run workflow
+```
+
+选择包含候选 SHA 的分支并运行。完成后下载页面底部的 Artifact。
+
+也可使用 GitHub CLI：
+
+```bash
+gh workflow run desktop-build.yml --ref main
+gh run list --workflow desktop-build.yml --limit 5
+```
+
+### 3. 核对 Artifact
+
+解压后应包含：
+
+```text
+PixelAnchorStudio-<version>-Portable.zip
+PixelAnchorStudio-<version>-Setup.exe
 SHA256SUMS.txt
 ```
 
-PowerShell：
+确认 Actions 页面显示的提交 SHA 与候选 SHA 完全一致。
+
+### 4. Windows 实机检查
+
+至少验证：
+
+- Portable 解压、启动、导入、保存项目和导出；
+- Portable 数据写入 `PixelAnchorStudio-Portable\data`；
+- Setup 不显示安装路径或数据路径页面；
+- Setup 固定安装到 `%LOCALAPPDATA%\Programs\PixelAnchorStudio`；
+- 安装版数据固定写入 `%LOCALAPPDATA%\PixelAnchorStudio\data`；
+- 开始菜单和桌面快捷方式勾选生效；
+- 缺少 WebView2 时可以完成依赖安装或给出明确错误；
+- 覆盖安装、卸载和所有权保护行为正确；
+- 两种发行形式显示的版本号正确；
+- `SHA256SUMS.txt` 与两个产物一致。
+
+任何一项失败都应修复并形成新提交，然后从 CI 和候选包构建重新开始。不要给失败提交打正式 Tag。
+
+---
+
+## 七、SHA-256 校验
+
+在包含产物和 `SHA256SUMS.txt` 的目录运行：
 
 ```powershell
-Get-FileHash .\PixelAnchorStudio-0.5.1-Setup.exe -Algorithm SHA256
-Get-FileHash .\PixelAnchorStudio-0.5.1-Portable.zip -Algorithm SHA256
+Get-FileHash .\PixelAnchorStudio-*-Setup.exe -Algorithm SHA256
+Get-FileHash .\PixelAnchorStudio-*-Portable.zip -Algorithm SHA256
+Get-Content .\SHA256SUMS.txt
 ```
 
-结果必须和SHA文件一致。
+两个哈希必须逐字符一致。正式 Release 页面必须同时附带 `SHA256SUMS.txt`。
 
 ---
 
-# 十二、测试包是否放到Releases
+## 八、正式 Release：当前可执行流程
 
-通常不需要,它不是面向普通用户的长期下载且14天后自动过期。因此测试包一般只下载自己测试即可。
+答案是：**先完整测试某个确定提交，确认正确后，再发布这个提交。**
 
----
+### 阶段 A：准备最终版本提交
 
-## 5. 自动重新构建正式包
+1. 用 `npm version <version> --no-git-tag-version` 设置正式版本；
+2. 同步桌面版本并更新 CHANGELOG、README 和 Release Notes；
+3. 运行本地检查；
+4. Commit、Push；
+5. 等待该提交 CI 全绿；
+6. 手动构建并实机测试候选包。
 
-未来的Release Workflow应从版本对应Commit重新构建。完成后自动建立Draft Release
+推荐本地检查：
 
----
+```bash
+npm run check
+npm run test:e2e
+cargo test --manifest-path src-tauri/Cargo.toml
+```
 
-## 6. 审核Draft
+### 阶段 B：给已验证提交打 Tag
 
-GitHub：
+只有候选包全部通过后才执行。假设版本为 `1.0.0`：
+
+```bash
+git tag -a v1.0.0 <VERIFIED_COMMIT_SHA> -m "Pixel Anchor Studio v1.0.0"
+git show --no-patch --decorate v1.0.0
+git push origin v1.0.0
+```
+
+Tag 必须直接指向刚才通过 CI 和 Windows 实测的同一个 SHA。不要在测试后又修改文档、版本或代码，再把 Tag 打到另一个提交。
+
+### 阶段 C：从 Tag 重新生成正式资产
+
+当前没有自动 Release Workflow，因此使用 GitHub CLI 从 Tag 调度现有 Desktop Build：
+
+```bash
+gh workflow run desktop-build.yml --ref v1.0.0
+gh run list --workflow desktop-build.yml --limit 5
+```
+
+在 Actions 页面确认该运行对应的 Commit 与 Tag 指向一致，下载新 Artifact 并再次校验 SHA。正式资产应来自 Tag 构建，不要把其他提交的 Artifact 改名后上传。
+
+### 阶段 D：建立 Draft Release
+
+可以使用 GitHub 网页：
 
 ```text
-Releases
-→ Draft
+Releases → Draft a new release → 选择现有 Tag → 上传三个资产 → Save draft
 ```
 
-检查：
+也可以在已下载文件位于 `release/` 时使用 GitHub CLI：
 
-- Tag；
-- Commit；
--版本号；
--Setup；
--Portable；
--SHA；
--Release Notes。
+```bash
+gh release create v1.0.0 release/PixelAnchorStudio-1.0.0-Portable.zip release/PixelAnchorStudio-1.0.0-Setup.exe release/SHA256SUMS.txt --verify-tag --draft --title "Pixel Anchor Studio v1.0.0" --notes-file release-notes.md
+```
 
----
+Draft 中必须检查：
 
-## 7. 下载Draft资产做最终抽检
+- Tag 和目标 Commit；
+- 标题与版本号；
+- Portable、Setup、SHA 三个资产；
+- 安装版“不推荐”、便携版“推荐”的说明；
+- 系统要求、SmartScreen 和未签名提示；
+- CHANGELOG 与 Release Notes 一致性。
 
-至少再次确认：
+### 阶段 E：下载 Draft 资产并最终抽检
+
+不要只相信本地候选包。应从 Draft 页面重新下载公开资产，至少再次验证：
 
 ```text
-安装版能启动
-便携版能启动
-版本号为1.0.0
-SHA一致
+文件名与版本号
+SHA-256
+Portable 启动
+Setup 安装与启动
+固定安装/数据目录
+快捷方式
+核心导入与导出
 ```
 
----
+全部通过后再点击 `Publish release`，或执行：
+
+```bash
+gh release edit v1.0.0 --draft=false
+```
+
+已推送的正式 Tag 不要移动或覆盖。发布前后若发现阻断问题，修复后发布新的补丁版本，例如 `v1.0.1`。
 
 ---
 
-# 十九、Beta和RC怎么处理
+## 九、Beta、RC 与测试 Artifact
 
-如果需要公开测试可建立GitHub Pre-release,但如果只是开发者自己测试,Desktop Build Artifact已经足够，不需要污染Releases列表。
+- 仅开发者内部测试：使用 Desktop Build Artifact，不创建 Release。
+- 需要公开测试：创建 GitHub Pre-release，例如 `v1.0.0-rc.1`。
+- 正式版：候选提交通过后打稳定 Tag，建立 Draft，抽检后 Publish。
+
+测试 Artifact 是短期构建记录，不等于 Release。不要给 Artifact 改名后直接当正式资产。
 
 ---
 
-# 二十、推荐日常工作流
+## 十、推荐日常流程
 
-## 日常开发
+### 日常开发
 
 ```text
-开发
-↓
-Commit
-↓
-Push
-↓
-CI
+开发 → 分阶段 Commit → Push → CI
+```
+
+### 桌面阶段验证
+
+```text
+Push → CI 通过 → 手动 Desktop Build → 下载 Artifact → Windows 实测
+```
+
+### 正式发布
+
+```text
+先设置正式版本号
+→ 最终提交
+→ CI
+→ 候选 Artifact 实测
+→ Tag 同一 SHA
+→ 从 Tag 重新构建
+→ Draft Release
+→ 下载 Draft 资产抽检
+→ Publish
 ```
 
 ---
 
-## 阶段性桌面测试
+## 十一、常见错误
 
-```text
-阶段开发完成
-↓
-Push
-↓
-CI通过
-↓
-手动Desktop Build
-↓
-下载Artifact
-↓
-Windows测试
-```
+### 每次 Push 都生成桌面包
 
----
+没有必要。只在桌面相关修改、阶段验证或发布候选时手动构建。
 
-## 正式发布
+### 测试完再修改版本号并直接发布
 
-```text
-最终代码
-↓
-Push
-↓
-CI
-↓
-手动Desktop Build候选验证
-↓
-Tag
-↓
-Release Workflow重新构建
-↓
-Draft Release
-↓
-最终抽检
-↓
-Publish
-```
+不可以。修改版本号会产生新提交，必须重新经过 CI 和候选包验证。
+
+### 手工同时修改多个版本文件
+
+不建议。使用 `npm version ... --no-git-tag-version` 修改根版本，再运行 `desktop:sync-version`。
+
+### 把 Artifact 当成 Release
+
+Artifact 是 14 天短期测试产物；Release 是绑定 Tag 的公开发行记录。
+
+### Tag 指向“差不多”的提交
+
+不可以。Tag 必须等于记录并验证过的候选 SHA。
+
+### 正式 Tag 后继续移动 Tag
+
+不要重写已推送 Tag。创建新的补丁版本。
+
+### 忘记推荐便携版
+
+README、Release Notes 和下载说明都应把 Portable 放在前面，并明确安装版不提供自定义路径且不作为首选。
 
 ---
 
-# 二十一、当前v0.5.1要验证什么
-
-现在最重要的验证是：
-
-## Push
-
-正常Push一个提交。
-
-Actions应自动出现：
-
-```text
-CI
-```
-
-不应自动出现：
-
-```text
-Desktop Build
-```
-
----
-
-## 手动Build
-
-随后：
-
-```text
-Actions
-→ Desktop Build
-→ Run workflow
-```
-
-应出现：
-
-```text
-windows-x64
-```
-
-并最终生成Artifact。
-
-Releases页面不应新增任何内容。
-
-这说明v0.5.1工作流拆分正确。
-
----
-
-# 二十二、常见错误
-
-## 每次Push都手动打桌面包
-
-没必要。
-
-只有需要Windows真实验证时才打。
-
-## 把Artifact当Release
-
-Artifact是开发测试产物；Release是公开发行记录。
-
-## 给测试Artifact改名后直接当正式包
-
-不要。
-
-正式包必须从最终Tag重新构建。
-
-## 正式Tag之后继续移动Tag
-
-不要重写正式Tag。
-
-发现问题应：
-
-```text
-修复
-→ v1.0.1
-```
-
-## 忘记验证SHA
-
-正式发布前Setup和Portable都必须能在`SHA256SUMS.txt`中找到对应校验值。
-
----
-
-# 二十三、工作流速查表
-
-| 场景 | CI | 手动 Desktop Build | Artifact | Release |
-|---|---:|---:|---:|---:|
-| 日常开发Push | 自动 | 否 | 否 | 否 |
-| 普通Bug修复 | 自动 | 通常否 | 否 | 否 |
-| 桌面功能修改 | 自动 | 是 | 是 | 否 |
-| 安装器修改 | 自动 | 是 | 是 | 否 |
-| 阶段性Windows测试 | 自动 | 是 | 是 | 否 |
-| 内部Release Candidate | 自动 | 是 | 是 | 否 |
-| 公开Beta/RC | 自动 | 候选阶段可手动 | 正式Tag重新构建 | Pre-release |
-| v1.0.0 | 自动 | Tag前候选测试 | 测试Artifact | Tag重新构建后Draft→Publish |
-
----
-
-# 二十四、当前关键文件
+## 十二、关键文件
 
 ```text
 .github/workflows/ci.yml
 .github/workflows/desktop-build.yml
 
 package.json
+package-lock.json
 
-scripts/
-  fetch-webview2-bootstrapper.mjs
-  build-portable.mjs
-  collect-installer.mjs
-  generate-install-manifest.mjs
-  generate-checksums.mjs
-  sync-desktop-version.mjs
+scripts/sync-desktop-version.mjs
+scripts/fetch-webview2-bootstrapper.mjs
+scripts/build-portable.mjs
+scripts/collect-installer.mjs
+scripts/generate-install-manifest.mjs
+scripts/generate-checksums.mjs
 
-src-tauri/
-  tauri.conf.json
-  tauri.install.conf.json
-  nsis/
+src-tauri/tauri.conf.json
+src-tauri/tauri.install.conf.json
+src-tauri/Cargo.toml
+src-tauri/Cargo.lock
+src-tauri/nsis/installer.nsi
+src-tauri/nsis/installer-hooks.nsh
 
 CHANGELOG.md
 README.md
 ```
 
-v1.0.0前计划新增：
-
-```text
-.github/workflows/release.yml
-```
-
----
-
-# 二十五、最简记忆
-
-只需要记住三句话：
-
-> **Push负责自动验证代码。**
-
-> **Desktop Build负责按需生成测试Windows包。**
-
-> **Release Workflow负责从正式Tag重新构建并创建公开版本。**
-
-当前v0.5.1已经完成前两层。
-
-第三层留到v1.0.0正式发布前实现和验证。
+如果未来新增 `.github/workflows/release.yml`，应让它仅响应符合规则的 Tag，从 Tag 对应 SHA 重新执行全部检查和 Windows 构建，创建 Draft Release 而不是直接公开发布。在该工作流真正加入并验证前，本指南第八节的手动 Draft 流程是唯一受支持的正式发布方式。
