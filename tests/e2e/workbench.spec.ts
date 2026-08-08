@@ -1,5 +1,6 @@
 import { expect, test, type Download, type Page } from '@playwright/test'
 import { deflateSync } from 'node:zlib'
+import { QUICK_START_SEEN_KEY } from '../../src/core/onboarding'
 
 function crc32(bytes: Uint8Array): number {
   let crc = 0xffffffff
@@ -54,10 +55,10 @@ async function readDownload(download: Download): Promise<Buffer> {
 }
 
 async function openWorkbench(page: Page): Promise<void> {
+  await page.addInitScript((key) => window.localStorage.setItem(key, '1'), QUICK_START_SEEN_KEY)
   await page.goto('/')
-  const dialog = page.getByRole('dialog', { name: '锚点像素工作台' })
-  await expect(dialog).toBeVisible()
-  await dialog.locator('.about-footer').getByRole('button', { name: '关闭' }).click()
+  await expect(page.getByRole('button', { name: '导入图片' })).toBeVisible()
+  await expect(page.getByRole('dialog', { name: '锚点像素工作台' })).toBeHidden()
 }
 
 async function chooseImage(page: Page, file: { name: string; mimeType: string; buffer: Buffer }): Promise<void> {
@@ -586,6 +587,8 @@ test('keeps source drag capture outside the canvas and commits crop drafts on re
 
 test('shows quick start once and reopens release notes and license from the title', async ({ page }) => {
   await page.goto('/')
+  await page.evaluate((key) => window.localStorage.removeItem(key), QUICK_START_SEEN_KEY)
+  await page.reload()
   const dialog = page.getByRole('dialog', { name: '锚点像素工作台' })
   await expect(dialog).toBeVisible()
   await expect(dialog.getByRole('button', { name: '快速开始' })).toBeVisible()
