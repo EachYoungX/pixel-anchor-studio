@@ -390,8 +390,17 @@ Function PageLeaveReinstall
   reinst_done:
 FunctionEnd
 
-; 5. Pixel Anchor Studio controlled install directory page
-Page custom PasInstallPageCreate PasInstallPageLeave
+; 5. Native MUI directory page backed by a dedicated session variable.
+; The built-in page owns its input state across Back / Next navigation, while
+; PasInstallPageLeave normalizes the fixed PixelAnchorStudio folder name and
+; synchronizes the final value to $INSTDIR.
+!define MUI_DIRECTORYPAGE_VARIABLE $PasInstallDirectory
+!define MUI_PAGE_CUSTOMFUNCTION_PRE PasInstallPagePre
+!define MUI_PAGE_CUSTOMFUNCTION_LEAVE PasInstallPageLeave
+!define MUI_PAGE_HEADER_TEXT "安装位置"
+!define MUI_PAGE_HEADER_SUBTEXT "选择锚点像素工作台的程序文件位置"
+!define MUI_DIRECTORYPAGE_TEXT_TOP "安装目录可以直接输入、复制或粘贴；应用文件夹名固定为 PixelAnchorStudio。"
+!insertmacro MUI_PAGE_DIRECTORY
 
 ; 6. Pixel Anchor Studio data, shortcut, dependency, and confirmation pages
 Page custom PasDataPageCreate PasDataPageLeave

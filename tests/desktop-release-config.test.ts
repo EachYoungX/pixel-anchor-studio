@@ -29,19 +29,20 @@ describe('desktop installer configuration', () => {
     expect(preinstall.indexOf('PAS_DETECT_WEBVIEW2')).toBeLessThan(preinstall.indexOf('PAS_CREATE_OWNER_MARKER'))
   })
 
-  it('uses controlled install browsing and preserves explicit data modes', () => {
+  it('uses the native directory page with dedicated install and data session state', () => {
     const template = readWorkspaceFile('src-tauri/nsis/installer.nsi')
     const hooks = readWorkspaceFile('src-tauri/nsis/installer-hooks.nsh')
 
-    expect(template).toContain('Page custom PasInstallPageCreate PasInstallPageLeave')
-    expect(template).not.toContain('!insertmacro MUI_PAGE_DIRECTORY')
-    expect(hooks).toContain('Call PasFindExistingDirectory')
-    expect(hooks).toContain('nsDialogs::SelectFolderDialog "选择安装根目录" "$0"')
+    expect(template).not.toContain('Page custom PasInstallPageCreate PasInstallPageLeave')
+    expect(template).toContain('!define MUI_DIRECTORYPAGE_VARIABLE $PasInstallDirectory')
+    expect(template).toContain('!define MUI_PAGE_CUSTOMFUNCTION_PRE PasInstallPagePre')
+    expect(template).toContain('!define MUI_PAGE_CUSTOMFUNCTION_LEAVE PasInstallPageLeave')
+    expect(template).toContain('!insertmacro MUI_PAGE_DIRECTORY')
     expect(hooks).toContain('Var PasInstallDirectory')
     expect(hooks).toContain('StrCpy $PasInstallDirectory "$INSTDIR"')
     expect(hooks).toContain('StrCpy $INSTDIR "$PasInstallDirectory"')
-    expect(hooks).toContain('${NSD_CreateText} 0 34u 78% 13u "$PasInstallDirectory"')
-    expect(hooks).toMatch(/Function PasBrowseInstall\s+Pop \$0\s+\$\{NSD_GetText\}/)
+    expect(hooks).not.toContain('Function PasInstallPageCreate')
+    expect(hooks).not.toContain('Function PasBrowseInstall')
     expect(hooks).toMatch(/Function PasUseDefaultData\s+Pop \$0/)
     expect(hooks).toMatch(/Function PasUseInstallData\s+Pop \$0/)
     expect(hooks).toMatch(/Function PasBrowseData\s+Pop \$0\s+\$\{NSD_GetText\}/)
