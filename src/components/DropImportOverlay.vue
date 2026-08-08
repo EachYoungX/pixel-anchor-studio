@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { SUPPORTED_IMAGE_TYPES_TEXT } from '@/core/import/drop-files'
 
-defineProps<{ active: boolean; waiting?: boolean }>()
+defineProps<{ active: boolean }>()
 </script>
 
 <template>
@@ -11,9 +11,8 @@ defineProps<{ active: boolean; waiting?: boolean }>()
         <svg class="drop-import-icon" viewBox="0 0 64 64" aria-hidden="true">
           <path d="M15 41v7a5 5 0 0 0 5 5h24a5 5 0 0 0 5-5v-7M32 11v30m0-30L21 22m11-11 11 11" />
         </svg>
-        <strong>{{ waiting ? '正在处理拖入文件…' : '释放鼠标以导入图片' }}</strong>
-        <span v-if="waiting">正在等待桌面文件授权，文件仍仅在本地处理</span>
-        <span v-else>支持 {{ SUPPORTED_IMAGE_TYPES_TEXT }} 等图片<br />也可以拖入 Pixel Anchor Studio 项目文件 · 文件仅在本地处理</span>
+        <strong>释放鼠标以导入图片</strong>
+        <span>支持 {{ SUPPORTED_IMAGE_TYPES_TEXT }} 等图片<br />也可以拖入 Pixel Anchor Studio 项目文件 · 文件仅在本地处理</span>
       </div>
     </div>
   </Transition>

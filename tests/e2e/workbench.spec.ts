@@ -517,11 +517,11 @@ test('keeps document scrolling and completes crop, project, and bead export flow
   await expect(page.getByRole('button', { name: '撤销' })).toBeEnabled()
   await page.getByRole('button', { name: '撤销' }).click()
 
-  await chooseProject(page, {
+  await dispatchFileDrag(page, 'drop', [{
     name: 'v040-roundtrip.pixel-anchor.json',
     mimeType: 'application/json',
     buffer: savedProject,
-  })
+  }])
   await discardUnsavedChanges(page, '打开其他项目将替换当前工作内容。')
   await expect(page.getByText('项目已打开', { exact: true })).toBeVisible()
 

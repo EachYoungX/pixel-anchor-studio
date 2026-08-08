@@ -22,7 +22,7 @@ const workspaceMode = ref<WorkspaceMode>('pixel')
 const fileActions = useProjectFileActions()
 const unsavedGuard = useUnsavedChangesGuard(fileActions.saveProject)
 useGlobalShortcuts()
-const { dropActive, dropWaiting, notice: importNotice, dismissNotice } = useFileDropImport()
+const { dropActive, notice: importNotice, dismissNotice } = useFileDropImport()
 useDesktopWindowLifecycle()
 </script>
 
@@ -71,7 +71,7 @@ useDesktopWindowLifecycle()
       <span>{{ store.status }}</span>
       <span v-if="store.lastDurationMs > 0">处理耗时 {{ store.lastDurationMs.toFixed(0) }} ms</span>
     </footer>
-    <DropImportOverlay :active="dropActive" :waiting="dropWaiting" />
+    <DropImportOverlay :active="dropActive" />
     <UnsavedChangesDialog
       :open="unsavedGuard.open.value"
       :saving="unsavedGuard.saving.value"
