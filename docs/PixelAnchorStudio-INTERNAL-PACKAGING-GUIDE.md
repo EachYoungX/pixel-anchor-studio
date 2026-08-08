@@ -4,7 +4,7 @@
 
 ---
 
-## 一、先记住四个结论
+## 一、流程与发布原则
 
 1. 普通 Push 只运行 CI，不生成 Windows 安装包。
 2. `Desktop Build` 只手动运行，用来生成指定提交的 Windows 测试包。
@@ -52,27 +52,22 @@ PixelAnchorStudio-<version>-Setup.exe
 数据：%LOCALAPPDATA%\PixelAnchorStudio\data
 ```
 
-安装器页面只保留欢迎/许可证、已有版本维护（仅检测到旧版本时出现）、开始菜单与桌面快捷方式选项、安装进度和完成页。WebView2 缺失时由安装过程自动运行随包提供的官方 Bootstrapper，不再单独显示路径、数据或 WebView2 配置页。
+安装器不显示安装路径或数据路径页面。可见流程包括欢迎/许可证、已有版本维护（仅检测到旧版本时出现）、开始菜单与桌面快捷方式选项、WebView2 检查、安装确认、安装进度和完成页。WebView2 缺失时可在检查页运行随包提供的官方 Bootstrapper。
 
 安装版仅适合希望使用 Windows“已安装的应用”、标准卸载入口和快捷方式管理的用户。README、Release Notes 和下载说明都应明确“不建议安装版，推荐便携版”。
 
 ---
 
-## 三、版本号依赖什么
+## 三、版本号管理
 
-### 唯一人工版本源
+### 版本源
 
 根目录 [`package.json`](../package.json) 的 `version` 是发布版本号的人工源头。
 
 以下产物名称都直接读取它：
 
-```text
-scripts/build-portable.mjs
-→ PixelAnchorStudio-<version>-Portable.zip
-
-scripts/collect-installer.mjs
-→ PixelAnchorStudio-<version>-Setup.exe
-```
+1. `scripts/build-portable.mjs` 生成 `PixelAnchorStudio-<version>-Portable.zip`；
+2. `scripts/collect-installer.mjs` 生成 `PixelAnchorStudio-<version>-Setup.exe`。
 
 `scripts/sync-desktop-version.mjs` 会在桌面构建前把同一版本同步到：
 
@@ -83,7 +78,7 @@ src-tauri/Cargo.toml
 
 `desktop:build`、`desktop:portable` 和 `desktop:installer` 都会调用同步脚本。因此不需要每次手工修改多个桌面配置文件。
 
-### 发布新版本时怎么改
+### 版本更新步骤
 
 在干净工作区中只执行一次：
 
@@ -108,7 +103,7 @@ package-lock.json
 git diff -- package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock
 ```
 
-不要只手改生成出来的 Setup 或 Portable 文件名，也不要只改 `tauri.conf.json`。下一次脚本运行会重新以 `package.json` 为准。
+Setup、Portable 文件名和 `tauri.conf.json` 不应作为独立版本源；后续脚本运行始终以 `package.json` 为准。
 
 版本提交还应同时更新：
 
@@ -122,29 +117,11 @@ Release Notes 草稿
 
 ---
 
-## 四、三条自动化链路
+## 四、自动化流程
 
-```text
-日常开发 Push
-      ↓
-      CI
-
-需要 Windows 实机验证
-      ↓
-手动 Desktop Build
-      ↓
-短期 Artifact
-
-正式版本
-      ↓
-候选提交验证通过
-      ↓
-Tag 同一提交
-      ↓
-从 Tag 重新构建
-      ↓
-Draft Release → 抽检 → Publish
-```
+1. 日常开发：Push 后由 CI 自动检查代码，不生成 Windows 包。
+2. Windows 实机验证：手动运行 Desktop Build，生成短期 Artifact。
+3. 正式发布：验证候选提交，为同一提交创建 Tag，从 Tag 重新构建，建立 Draft Release，完成抽检后公开发布。
 
 ### CI
 
@@ -201,7 +178,7 @@ PixelAnchorStudio-<commit-sha>-windows-x64
 
 ---
 
-## 五、什么时候需要 Desktop Build
+## 五、Desktop Build 适用范围
 
 以下情况应生成 Windows 测试包：
 
@@ -216,9 +193,9 @@ PixelAnchorStudio-<commit-sha>-windows-x64
 
 ---
 
-## 六、如何生成并验证候选包
+## 六、候选包的生成与验证
 
-### 1. 固定候选提交
+### 1. 记录候选提交
 
 先 Push，等待该提交的 CI 全绿，然后记录完整 SHA：
 
@@ -226,17 +203,18 @@ PixelAnchorStudio-<commit-sha>-windows-x64
 git rev-parse HEAD
 ```
 
-测试记录中必须保存这个 SHA。不要只写“最新 main”。
+测试记录必须保存完整 SHA，不使用“最新 main”等可变描述。
 
-### 2. 手动运行 Desktop Build
+### 2. 运行 Desktop Build
 
 网页操作：
 
-```text
-GitHub → Actions → Desktop Build → Run workflow
-```
+1. 打开 GitHub 仓库的 `Actions` 页面；
+2. 选择 `Desktop Build`；
+3. 点击 `Run workflow`；
+4. 选择包含候选 SHA 的分支并运行。
 
-选择包含候选 SHA 的分支并运行。完成后下载页面底部的 Artifact。
+工作流完成后，从运行详情页面下载 Artifact。
 
 也可使用 GitHub CLI：
 
@@ -272,7 +250,7 @@ SHA256SUMS.txt
 - 两种发行形式显示的版本号正确；
 - `SHA256SUMS.txt` 与两个产物一致。
 
-任何一项失败都应修复并形成新提交，然后从 CI 和候选包构建重新开始。不要给失败提交打正式 Tag。
+任何一项失败都应修复并形成新提交，然后重新执行 CI 和候选包构建。失败提交不得创建正式 Tag。
 
 ---
 
@@ -290,11 +268,11 @@ Get-Content .\SHA256SUMS.txt
 
 ---
 
-## 八、正式 Release：当前可执行流程
+## 八、正式 Release 流程
 
-答案是：**先完整测试某个确定提交，确认正确后，再发布这个提交。**
+正式发布以已验证的确定提交为对象。候选提交通过全部检查后，正式 Tag 必须指向同一提交。
 
-### 阶段 A：准备最终版本提交
+### 1. 准备最终版本提交
 
 1. 用 `npm version <version> --no-git-tag-version` 设置正式版本；
 2. 同步桌面版本并更新 CHANGELOG、README 和 Release Notes；
@@ -311,7 +289,7 @@ npm run test:e2e
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
-### 阶段 B：给已验证提交打 Tag
+### 2. 为已验证提交创建 Tag
 
 只有候选包全部通过后才执行。假设版本为 `1.0.0`：
 
@@ -321,9 +299,9 @@ git show --no-patch --decorate v1.0.0
 git push origin v1.0.0
 ```
 
-Tag 必须直接指向刚才通过 CI 和 Windows 实测的同一个 SHA。不要在测试后又修改文档、版本或代码，再把 Tag 打到另一个提交。
+Tag 必须直接指向通过 CI 和 Windows 实测的同一个 SHA。测试完成后的任何文档、版本或代码修改都会形成新的候选提交，并需要重新验证。
 
-### 阶段 C：从 Tag 重新生成正式资产
+### 3. 从 Tag 重新生成正式资产
 
 当前没有自动 Release Workflow，因此使用 GitHub CLI 从 Tag 调度现有 Desktop Build：
 
@@ -332,15 +310,17 @@ gh workflow run desktop-build.yml --ref v1.0.0
 gh run list --workflow desktop-build.yml --limit 5
 ```
 
-在 Actions 页面确认该运行对应的 Commit 与 Tag 指向一致，下载新 Artifact 并再次校验 SHA。正式资产应来自 Tag 构建，不要把其他提交的 Artifact 改名后上传。
+在 Actions 页面确认该运行对应的 Commit 与 Tag 指向一致，下载新 Artifact 并再次校验 SHA。正式资产必须来自 Tag 构建，其他提交的 Artifact 不得通过改名作为正式资产。
 
-### 阶段 D：建立 Draft Release
+### 4. 建立 Draft Release
 
 可以使用 GitHub 网页：
 
-```text
-Releases → Draft a new release → 选择现有 Tag → 上传三个资产 → Save draft
-```
+1. 打开 `Releases` 页面；
+2. 选择 `Draft a new release`；
+3. 选择已经创建的 Tag；
+4. 上传 Portable、Setup 和 `SHA256SUMS.txt`；
+5. 选择 `Save draft`。
 
 也可以在已下载文件位于 `release/` 时使用 GitHub CLI：
 
@@ -357,19 +337,17 @@ Draft 中必须检查：
 - 系统要求、SmartScreen 和未签名提示；
 - CHANGELOG 与 Release Notes 一致性。
 
-### 阶段 E：下载 Draft 资产并最终抽检
+### 5. 下载 Draft 资产并最终抽检
 
-不要只相信本地候选包。应从 Draft 页面重新下载公开资产，至少再次验证：
+最终抽检应使用从 Draft 页面重新下载的资产，至少验证：
 
-```text
-文件名与版本号
-SHA-256
-Portable 启动
-Setup 安装与启动
-固定安装/数据目录
-快捷方式
-核心导入与导出
-```
+1. 文件名与版本号；
+2. SHA-256；
+3. Portable 启动；
+4. Setup 安装与启动；
+5. 固定安装目录和数据目录；
+6. 快捷方式；
+7. 核心导入与导出。
 
 全部通过后再点击 `Publish release`，或执行：
 
@@ -377,77 +355,78 @@ Setup 安装与启动
 gh release edit v1.0.0 --draft=false
 ```
 
-已推送的正式 Tag 不要移动或覆盖。发布前后若发现阻断问题，修复后发布新的补丁版本，例如 `v1.0.1`。
+已推送的正式 Tag 不得移动或覆盖。发布前后若发现阻断问题，应修复后发布新的补丁版本，例如 `v1.0.1`。
 
 ---
 
-## 九、Beta、RC 与测试 Artifact
+## 九、测试 Artifact 与预发布版本
 
 - 仅开发者内部测试：使用 Desktop Build Artifact，不创建 Release。
 - 需要公开测试：创建 GitHub Pre-release，例如 `v1.0.0-rc.1`。
 - 正式版：候选提交通过后打稳定 Tag，建立 Draft，抽检后 Publish。
 
-测试 Artifact 是短期构建记录，不等于 Release。不要给 Artifact 改名后直接当正式资产。
+测试 Artifact 是短期构建记录，不等同于 Release，也不得通过改名直接作为正式资产。
 
 ---
 
-## 十、推荐日常流程
+## 十、开发与发布操作顺序
 
 ### 日常开发
 
-```text
-开发 → 分阶段 Commit → Push → CI
-```
+1. 完成一个可独立说明的开发板块；
+2. 创建本地 Commit；
+3. Push；
+4. 等待 CI 结果。
 
 ### 桌面阶段验证
 
-```text
-Push → CI 通过 → 手动 Desktop Build → 下载 Artifact → Windows 实测
-```
+1. Push 阶段性提交；
+2. 确认 CI 通过；
+3. 手动运行 Desktop Build；
+4. 下载 Artifact；
+5. 完成 Windows 实机测试。
 
 ### 正式发布
 
-```text
-先设置正式版本号
-→ 最终提交
-→ CI
-→ 候选 Artifact 实测
-→ Tag 同一 SHA
-→ 从 Tag 重新构建
-→ Draft Release
-→ 下载 Draft 资产抽检
-→ Publish
-```
+1. 设置正式版本号；
+2. 创建最终候选提交；
+3. 等待 CI 通过；
+4. 构建并实测候选 Artifact；
+5. 为同一 SHA 创建 Tag；
+6. 从 Tag 重新构建正式资产；
+7. 建立 Draft Release；
+8. 下载 Draft 资产并抽检；
+9. 发布 Release。
 
 ---
 
-## 十一、常见错误
+## 十一、操作约束
 
-### 每次 Push 都生成桌面包
+### Desktop Build 运行频率
 
-没有必要。只在桌面相关修改、阶段验证或发布候选时手动构建。
+Desktop Build 仅用于桌面相关修改、阶段验证或发布候选，不随每次 Push 运行。
 
-### 测试完再修改版本号并直接发布
+### 版本变更后的重新验证
 
-不可以。修改版本号会产生新提交，必须重新经过 CI 和候选包验证。
+修改版本号会产生新提交，该提交必须重新经过 CI 和候选包验证。
 
-### 手工同时修改多个版本文件
+### 版本文件同步
 
-不建议。使用 `npm version ... --no-git-tag-version` 修改根版本，再运行 `desktop:sync-version`。
+使用 `npm version ... --no-git-tag-version` 修改根版本，再运行 `desktop:sync-version`；各桌面版本文件不单独维护。
 
-### 把 Artifact 当成 Release
+### Artifact 与 Release 的区别
 
 Artifact 是 14 天短期测试产物；Release 是绑定 Tag 的公开发行记录。
 
-### Tag 指向“差不多”的提交
+### Tag 与候选提交的一致性
 
-不可以。Tag 必须等于记录并验证过的候选 SHA。
+Tag 必须指向记录并验证过的候选 SHA。
 
-### 正式 Tag 后继续移动 Tag
+### 正式 Tag 的不可变性
 
-不要重写已推送 Tag。创建新的补丁版本。
+已推送 Tag 不得重写；后续修复使用新的补丁版本。
 
-### 忘记推荐便携版
+### 发行形式说明
 
 README、Release Notes 和下载说明都应把 Portable 放在前面，并明确安装版不提供自定义路径且不作为首选。
 
