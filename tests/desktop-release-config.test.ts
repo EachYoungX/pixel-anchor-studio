@@ -22,18 +22,23 @@ describe('desktop installer configuration', () => {
     expect(dataDirectory).toMatch(/\.join\("PixelAnchorStudio"\)\s*\.join\("data"\)/)
   })
 
-  it('removes directory selection and keeps only shortcut choices', () => {
+  it('removes directory selection while keeping dependency and confirmation pages', () => {
     const template = readWorkspaceFile('src-tauri/nsis/installer.nsi')
     const hooks = readWorkspaceFile('src-tauri/nsis/installer-hooks.nsh')
     const preinstall = hooks.slice(hooks.indexOf('!macro NSIS_HOOK_PREINSTALL'), hooks.indexOf('!macro NSIS_HOOK_POSTINSTALL'))
 
     expect(template).not.toContain('MUI_PAGE_DIRECTORY')
     expect(template).not.toContain('PasDataPageCreate')
-    expect(template).not.toContain('PasWebViewPageCreate')
-    expect(template).not.toContain('PasConfirmPageCreate')
     expect(template).toContain('Page custom PasOptionsPageCreate PasOptionsPageLeave')
+    expect(template).toContain('Page custom PasWebViewPageCreate PasWebViewPageLeave')
+    expect(template).toContain('Page custom PasConfirmPageCreate')
     expect(hooks).not.toContain('PasBrowseData')
     expect(hooks).not.toContain('PasInstallPage')
+    expect(hooks).toContain('Function PasWebViewPageCreate')
+    expect(hooks).toContain('Function PasWebViewPageLeave')
+    expect(hooks).toContain('Function PasConfirmPageCreate')
+    expect(hooks).toMatch(/Function PasConfirmPageCreate[\s\S]*StrCpy \$INSTDIR "\$LOCALAPPDATA\\Programs\\PixelAnchorStudio"/)
+    expect(hooks).toMatch(/Function PasConfirmPageCreate[\s\S]*StrCpy \$PasDataDirectory "\$LOCALAPPDATA\\PixelAnchorStudio\\data"/)
     expect(preinstall).toContain('MicrosoftEdgeWebView2Setup.exe')
     expect(preinstall.indexOf('PAS_DETECT_WEBVIEW2')).toBeLessThan(preinstall.indexOf('PAS_CREATE_OWNER_MARKER'))
   })

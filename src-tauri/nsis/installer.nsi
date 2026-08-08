@@ -392,9 +392,11 @@ Function PageLeaveReinstall
   reinst_done:
 FunctionEnd
 
-; 5. The only product-specific choice is shortcut creation. Install and data
-; directories are fixed and WebView2 is handled automatically during install.
+; 5. Product-specific pages. Install and data directories remain fixed; users
+; can choose shortcuts, review WebView2 status, and confirm the final settings.
 Page custom PasOptionsPageCreate PasOptionsPageLeave
+Page custom PasWebViewPageCreate PasWebViewPageLeave
+Page custom PasConfirmPageCreate
 
 ; Keep MUI's start-menu bookkeeping available to the upstream shortcut and
 ; uninstall helpers, while replacing its visible page with our combined
@@ -503,6 +505,7 @@ Function .onInit
 
   !insertmacro SetContext
   StrCpy $INSTDIR "$LOCALAPPDATA\Programs\${INSTALLFOLDERNAME}"
+  StrCpy $PasDataDirectory "$LOCALAPPDATA\PixelAnchorStudio\data"
 
 
   !if "${INSTALLMODE}" == "both"

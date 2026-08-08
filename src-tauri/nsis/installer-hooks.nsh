@@ -14,6 +14,7 @@ Var PasStartMenuCheckbox
 Var PasDesktopCheckbox
 Var PasStartMenuEnabled
 Var PasDesktopEnabled
+Var PasWebViewStatusLabel
 
 !macro PAS_DETECT_WEBVIEW2 OUT
   StrCpy ${OUT} ""
@@ -30,6 +31,8 @@ Function PasOptionsPageCreate
   ${If} $PassiveMode = 1
     Abort
   ${EndIf}
+  StrCpy $INSTDIR "$LOCALAPPDATA\Programs\PixelAnchorStudio"
+  StrCpy $PasDataDirectory "$LOCALAPPDATA\PixelAnchorStudio\data"
   ReadRegDWORD $PasStartMenuEnabled HKCU "${PAS_REGKEY}" "StartMenuShortcut"
   ${If} $PasStartMenuEnabled == ""
     StrCpy $PasStartMenuEnabled ${BST_CHECKED}
@@ -59,6 +62,78 @@ FunctionEnd
 Function PasOptionsPageLeave
   ${NSD_GetState} $PasStartMenuCheckbox $PasStartMenuEnabled
   ${NSD_GetState} $PasDesktopCheckbox $PasDesktopEnabled
+FunctionEnd
+
+Function PasWebViewPageCreate
+  ${If} $PassiveMode = 1
+    Abort
+  ${EndIf}
+  nsDialogs::Create 1018
+  Pop $0
+  ${If} $0 == error
+    Abort
+  ${EndIf}
+  !insertmacro MUI_HEADER_TEXT "WebView2 检查" "检查桌面界面所需的微软共享运行时"
+  !insertmacro PAS_DETECT_WEBVIEW2 $1
+  ${If} $1 == ""
+    ${NSD_CreateLabel} 0 8u 100% 36u "未检测到 Microsoft Edge WebView2 Runtime。点击“下一步”可运行微软官方 Bootstrapper；该步骤可能需要网络。"
+  ${Else}
+    ${NSD_CreateLabel} 0 8u 100% 36u "已检测到 Microsoft Edge WebView2 Runtime：$\r$\n$1"
+  ${EndIf}
+  Pop $PasWebViewStatusLabel
+  ${NSD_CreateLabel} 0 58u 100% 28u "工作台复用系统 Runtime，不捆绑固定版本。Bootstrapper 的来源和 SHA-256 在发布材料中锁定。"
+  Pop $0
+  nsDialogs::Show
+FunctionEnd
+
+Function PasWebViewPageLeave
+  !insertmacro PAS_DETECT_WEBVIEW2 $0
+  ${If} $0 != ""
+    Return
+  ${EndIf}
+  MessageBox MB_ICONEXCLAMATION|MB_YESNOCANCEL "锚点像素工作台需要 Microsoft Edge WebView2 Runtime。$\r$\n$\r$\n“是”：现在安装$\r$\n“否”：打开微软官方下载页$\r$\n“取消”：退出安装" IDYES pas_install_webview2_page IDNO pas_download_webview2_page
+  Quit
+  pas_download_webview2_page:
+    ExecShell "open" "https://developer.microsoft.com/microsoft-edge/webview2/"
+    Abort
+  pas_install_webview2_page:
+    File /oname=$TEMP\MicrosoftEdgeWebView2Setup.exe "${__FILEDIR__}\..\resources\MicrosoftEdgeWebView2Setup.exe"
+    ExecWait '"$TEMP\MicrosoftEdgeWebView2Setup.exe" /silent /install' $1
+    Delete "$TEMP\MicrosoftEdgeWebView2Setup.exe"
+    !insertmacro PAS_DETECT_WEBVIEW2 $0
+    ${If} $0 == ""
+      MessageBox MB_ICONSTOP "WebView2 Runtime 安装失败（代码 $1）。请检查网络或从微软页面手动安装后重试。"
+      Abort
+    ${EndIf}
+FunctionEnd
+
+Function PasConfirmPageCreate
+  ${If} $PassiveMode = 1
+    Abort
+  ${EndIf}
+  StrCpy $INSTDIR "$LOCALAPPDATA\Programs\PixelAnchorStudio"
+  StrCpy $PasDataDirectory "$LOCALAPPDATA\PixelAnchorStudio\data"
+  nsDialogs::Create 1018
+  Pop $0
+  ${If} $0 == error
+    Abort
+  ${EndIf}
+  !insertmacro MUI_HEADER_TEXT "确认安装" "确认以下设置后开始复制文件"
+  ${NSD_CreateLabel} 0 0 100% 66u "安装位置：$\r$\n$INSTDIR$\r$\n$\r$\n应用数据：$\r$\n$PasDataDirectory"
+  Pop $0
+  ${If} $PasStartMenuEnabled == ${BST_CHECKED}
+    StrCpy $1 "创建"
+  ${Else}
+    StrCpy $1 "不创建"
+  ${EndIf}
+  ${If} $PasDesktopEnabled == ${BST_CHECKED}
+    StrCpy $2 "创建"
+  ${Else}
+    StrCpy $2 "不创建"
+  ${EndIf}
+  ${NSD_CreateLabel} 0 76u 100% 30u "开始菜单快捷方式：$1$\r$\n桌面快捷方式：$2"
+  Pop $0
+  nsDialogs::Show
 FunctionEnd
 
 !macro PAS_CREATE_OWNER_MARKER
