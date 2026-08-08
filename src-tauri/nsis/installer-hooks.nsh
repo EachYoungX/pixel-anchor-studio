@@ -7,6 +7,10 @@
 !define PAS_REGKEY "Software\EachYoung\PixelAnchorStudio"
 !define PAS_OWNER_FILE "app-owner.json"
 !define PAS_WEBVIEW_GUID "{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
+; Freeze the source path while this hook file is being included. Tauri expands
+; NSIS_HOOK_PREINSTALL later from target/release/nsis/x64, where __FILEDIR__ no
+; longer points at src-tauri/nsis.
+!define PAS_WEBVIEW2_BOOTSTRAPPER_SOURCE "${__FILEDIR__}\..\resources\MicrosoftEdgeWebView2Setup.exe"
 
 Var PasDataDirectory
 Var PasInstallId
@@ -97,7 +101,7 @@ Function PasWebViewPageLeave
     ExecShell "open" "https://developer.microsoft.com/microsoft-edge/webview2/"
     Abort
   pas_install_webview2_page:
-    File /oname=$TEMP\MicrosoftEdgeWebView2Setup.exe "${__FILEDIR__}\..\resources\MicrosoftEdgeWebView2Setup.exe"
+    File /oname=$TEMP\MicrosoftEdgeWebView2Setup.exe "${PAS_WEBVIEW2_BOOTSTRAPPER_SOURCE}"
     ExecWait '"$TEMP\MicrosoftEdgeWebView2Setup.exe" /silent /install' $1
     Delete "$TEMP\MicrosoftEdgeWebView2Setup.exe"
     !insertmacro PAS_DETECT_WEBVIEW2 $0
@@ -161,7 +165,7 @@ FunctionEnd
   ; bootstrapper only when the shared runtime is missing.
   !insertmacro PAS_DETECT_WEBVIEW2 $0
   ${If} $0 == ""
-    File /oname=$TEMP\MicrosoftEdgeWebView2Setup.exe "${__FILEDIR__}\..\resources\MicrosoftEdgeWebView2Setup.exe"
+    File /oname=$TEMP\MicrosoftEdgeWebView2Setup.exe "${PAS_WEBVIEW2_BOOTSTRAPPER_SOURCE}"
     ExecWait '"$TEMP\MicrosoftEdgeWebView2Setup.exe" /silent /install' $1
     Delete "$TEMP\MicrosoftEdgeWebView2Setup.exe"
     !insertmacro PAS_DETECT_WEBVIEW2 $0

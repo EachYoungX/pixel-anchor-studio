@@ -43,6 +43,17 @@ describe('desktop installer configuration', () => {
     expect(preinstall.indexOf('PAS_DETECT_WEBVIEW2')).toBeLessThan(preinstall.indexOf('PAS_CREATE_OWNER_MARKER'))
   })
 
+  it('freezes the WebView2 bootstrapper source before Tauri expands installer hooks', () => {
+    const hooks = readWorkspaceFile('src-tauri/nsis/installer-hooks.nsh')
+    const preinstall = hooks.slice(hooks.indexOf('!macro NSIS_HOOK_PREINSTALL'), hooks.indexOf('!macro NSIS_HOOK_POSTINSTALL'))
+
+    expect(hooks).toContain(
+      '!define PAS_WEBVIEW2_BOOTSTRAPPER_SOURCE "${__FILEDIR__}\\..\\resources\\MicrosoftEdgeWebView2Setup.exe"',
+    )
+    expect(hooks.match(/File \/oname=\$TEMP\\MicrosoftEdgeWebView2Setup\.exe "\$\{PAS_WEBVIEW2_BOOTSTRAPPER_SOURCE\}"/g)).toHaveLength(2)
+    expect(preinstall).not.toContain('${__FILEDIR__}')
+  })
+
   it('uses safe shortcut and uninstall defaults', () => {
     const template = readWorkspaceFile('src-tauri/nsis/installer.nsi')
     const hooks = readWorkspaceFile('src-tauri/nsis/installer-hooks.nsh')
