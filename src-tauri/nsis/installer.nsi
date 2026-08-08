@@ -72,6 +72,10 @@ ${UnStrLoc}
 !define STARTMENUFOLDER "{{start_menu_folder}}"
 !define INSTALLFOLDERNAME "PixelAnchorStudio"
 
+!if "${INSTALLMODE}" != "currentUser"
+  !error "Pixel Anchor Studio installer only supports currentUser mode"
+!endif
+
 Var PassiveMode
 Var UpdateMode
 Var NoShortcutMode
@@ -86,11 +90,10 @@ Name "${PRODUCTNAME}"
 BrandingText "${COPYRIGHT}"
 OutFile "${OUTFILE}"
 
-; We don't actually use this value as default install path,
-; it's just for nsis to append the product name folder in the directory selector
-; https://nsis.sourceforge.io/Reference/InstallDir
-!define PLACEHOLDER_INSTALL_DIR "placeholder\${INSTALLFOLDERNAME}"
-InstallDir "${PLACEHOLDER_INSTALL_DIR}"
+; The installer deliberately has no directory page. Keep the application in a
+; predictable per-user location; portable builds are the recommended option for
+; users who need a movable application and colocated data.
+InstallDir "$LOCALAPPDATA\Programs\${INSTALLFOLDERNAME}"
 
 VIProductVersion "${VERSIONWITHBUILD}"
 VIAddVersionKey "ProductName" "${PRODUCTNAME}"
@@ -128,7 +131,6 @@ VIAddVersionKey "ProductVersion" "${VERSION}"
   !define MULTIUSER_INSTALLMODE_DEFAULT_REGISTRY_KEY "${UNINSTKEY}"
   !define MULTIUSER_INSTALLMODE_DEFAULT_REGISTRY_VALUENAME "CurrentUser"
   !define MULTIUSER_INSTALLMODEPAGE_SHOWUSERNAME
-  !define MULTIUSER_INSTALLMODE_FUNCTION RestorePreviousInstallLocation
   !define MULTIUSER_EXECUTIONLEVEL Highest
   !include MultiUser.nsh
 !endif
@@ -390,23 +392,9 @@ Function PageLeaveReinstall
   reinst_done:
 FunctionEnd
 
-; 5. Native MUI directory page backed by a dedicated session variable.
-; The built-in page owns its input state across Back / Next navigation, while
-; PasInstallPageLeave normalizes the fixed PixelAnchorStudio folder name and
-; synchronizes the final value to $INSTDIR.
-!define MUI_DIRECTORYPAGE_VARIABLE $PasInstallDirectory
-!define MUI_PAGE_CUSTOMFUNCTION_PRE PasInstallPagePre
-!define MUI_PAGE_CUSTOMFUNCTION_LEAVE PasInstallPageLeave
-!define MUI_PAGE_HEADER_TEXT "安装位置"
-!define MUI_PAGE_HEADER_SUBTEXT "选择锚点像素工作台的程序文件位置"
-!define MUI_DIRECTORYPAGE_TEXT_TOP "安装目录可以直接输入、复制或粘贴；应用文件夹名固定为 PixelAnchorStudio。"
-!insertmacro MUI_PAGE_DIRECTORY
-
-; 6. Pixel Anchor Studio data, shortcut, dependency, and confirmation pages
-Page custom PasDataPageCreate PasDataPageLeave
+; 5. The only product-specific choice is shortcut creation. Install and data
+; directories are fixed and WebView2 is handled automatically during install.
 Page custom PasOptionsPageCreate PasOptionsPageLeave
-Page custom PasWebViewPageCreate PasWebViewPageLeave
-Page custom PasConfirmPageCreate
 
 ; Keep MUI's start-menu bookkeeping available to the upstream shortcut and
 ; uninstall helpers, while replacing its visible page with our combined
@@ -420,10 +408,10 @@ Var AppStartMenuFolder
 !endif
 !insertmacro MUI_PAGE_STARTMENU Application $AppStartMenuFolder
 
-; 7. Installation progress page
+; 6. Installation progress page
 !insertmacro MUI_PAGE_INSTFILES
 
-; 8. Finish page
+; 7. Finish page
 ;
 ; Don't auto jump to finish page after installation page,
 ; because the installation page has useful info that can be used debug any issues with the installer.
@@ -514,27 +502,7 @@ Function .onInit
   !endif
 
   !insertmacro SetContext
-
-  ${If} $INSTDIR == "${PLACEHOLDER_INSTALL_DIR}"
-    ; Set default install location
-    !if "${INSTALLMODE}" == "perMachine"
-      ${If} ${RunningX64}
-        !if "${ARCH}" == "x64"
-          StrCpy $INSTDIR "$PROGRAMFILES64\${INSTALLFOLDERNAME}"
-        !else if "${ARCH}" == "arm64"
-          StrCpy $INSTDIR "$PROGRAMFILES64\${INSTALLFOLDERNAME}"
-        !else
-          StrCpy $INSTDIR "$PROGRAMFILES\${INSTALLFOLDERNAME}"
-        !endif
-      ${Else}
-        StrCpy $INSTDIR "$PROGRAMFILES\${INSTALLFOLDERNAME}"
-      ${EndIf}
-    !else if "${INSTALLMODE}" == "currentUser"
-      StrCpy $INSTDIR "$LOCALAPPDATA\Programs\${INSTALLFOLDERNAME}"
-    !endif
-
-    Call RestorePreviousInstallLocation
-  ${EndIf}
+  StrCpy $INSTDIR "$LOCALAPPDATA\Programs\${INSTALLFOLDERNAME}"
 
 
   !if "${INSTALLMODE}" == "both"
@@ -919,12 +887,6 @@ Section Uninstall
     SetAutoClose true
   ${EndIf}
 SectionEnd
-
-Function RestorePreviousInstallLocation
-  ReadRegStr $4 SHCTX "${MANUPRODUCTKEY}" ""
-  StrCmp $4 "" +2 0
-    StrCpy $INSTDIR $4
-FunctionEnd
 
 Function Skip
   Abort

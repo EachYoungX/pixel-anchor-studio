@@ -106,9 +106,6 @@ fn installed_data_directory() -> (PathBuf, Option<String>) {
     let registry = RegKey::predef(HKEY_CURRENT_USER)
         .open_subkey(REGISTRY_KEY)
         .ok();
-    let configured: Option<String> = registry
-        .as_ref()
-        .and_then(|key| key.get_value("DataDirectory").ok());
     let install_id: Option<String> = registry
         .as_ref()
         .and_then(|key| key.get_value("InstallId").ok());
@@ -116,13 +113,7 @@ fn installed_data_directory() -> (PathBuf, Option<String>) {
         .unwrap_or_else(|| std::env::temp_dir())
         .join("PixelAnchorStudio")
         .join("data");
-    (
-        configured
-            .filter(|value| !value.trim().is_empty())
-            .map(PathBuf::from)
-            .unwrap_or(fallback),
-        install_id,
-    )
+    (fallback, install_id)
 }
 
 #[cfg(not(windows))]

@@ -6,56 +6,36 @@ function readWorkspaceFile(path: string): string {
 }
 
 describe('desktop installer configuration', () => {
-  it('keeps physical install and data directories in the English app root', () => {
+  it('fixes installed-edition program and data directories', () => {
     const template = readWorkspaceFile('src-tauri/nsis/installer.nsi')
     const hooks = readWorkspaceFile('src-tauri/nsis/installer-hooks.nsh')
     const dataDirectory = readWorkspaceFile('src-tauri/src/data_directory.rs')
 
     expect(template).toContain('!define INSTALLFOLDERNAME "PixelAnchorStudio"')
-    expect(template).toContain('"$LOCALAPPDATA\\Programs\\${INSTALLFOLDERNAME}"')
-    expect(template).not.toContain('placeholder\\${PRODUCTNAME}')
-    expect(hooks).toContain('"$LOCALAPPDATA\\PixelAnchorStudio\\data"')
+    expect(template).toContain('InstallDir "$LOCALAPPDATA\\Programs\\${INSTALLFOLDERNAME}"')
+    expect(template).toContain('StrCpy $INSTDIR "$LOCALAPPDATA\\Programs\\${INSTALLFOLDERNAME}"')
+    expect(hooks).toContain('StrCpy $INSTDIR "$LOCALAPPDATA\\Programs\\PixelAnchorStudio"')
+    expect(hooks).toContain('StrCpy $PasDataDirectory "$LOCALAPPDATA\\PixelAnchorStudio\\data"')
+    expect(template).not.toContain('PLACEHOLDER_INSTALL_DIR')
+    expect(template).not.toContain('RestorePreviousInstallLocation')
+    expect(dataDirectory).not.toContain('get_value("DataDirectory")')
     expect(dataDirectory).toMatch(/\.join\("PixelAnchorStudio"\)\s*\.join\("data"\)/)
   })
 
-  it('keeps the data path editable and defers final creation to preinstall', () => {
+  it('removes directory selection and keeps only shortcut choices', () => {
+    const template = readWorkspaceFile('src-tauri/nsis/installer.nsi')
     const hooks = readWorkspaceFile('src-tauri/nsis/installer-hooks.nsh')
     const preinstall = hooks.slice(hooks.indexOf('!macro NSIS_HOOK_PREINSTALL'), hooks.indexOf('!macro NSIS_HOOK_POSTINSTALL'))
 
-    expect(hooks).not.toContain('EM_SETREADONLY')
-    expect(hooks).toContain('使用默认位置')
-    expect(hooks).toContain('使用安装位置')
-    expect(hooks).toContain('GetTempFileName')
+    expect(template).not.toContain('MUI_PAGE_DIRECTORY')
+    expect(template).not.toContain('PasDataPageCreate')
+    expect(template).not.toContain('PasWebViewPageCreate')
+    expect(template).not.toContain('PasConfirmPageCreate')
+    expect(template).toContain('Page custom PasOptionsPageCreate PasOptionsPageLeave')
+    expect(hooks).not.toContain('PasBrowseData')
+    expect(hooks).not.toContain('PasInstallPage')
+    expect(preinstall).toContain('MicrosoftEdgeWebView2Setup.exe')
     expect(preinstall.indexOf('PAS_DETECT_WEBVIEW2')).toBeLessThan(preinstall.indexOf('PAS_CREATE_OWNER_MARKER'))
-  })
-
-  it('uses the native directory page with dedicated install and data session state', () => {
-    const template = readWorkspaceFile('src-tauri/nsis/installer.nsi')
-    const hooks = readWorkspaceFile('src-tauri/nsis/installer-hooks.nsh')
-    const installPagePre = hooks.match(/Function PasInstallPagePre[\s\S]*?FunctionEnd/)?.[0] ?? ''
-
-    expect(template).not.toContain('Page custom PasInstallPageCreate PasInstallPageLeave')
-    expect(template).toContain('!define MUI_DIRECTORYPAGE_VARIABLE $PasInstallDirectory')
-    expect(template).toContain('!define MUI_PAGE_CUSTOMFUNCTION_PRE PasInstallPagePre')
-    expect(template).toContain('!define MUI_PAGE_CUSTOMFUNCTION_LEAVE PasInstallPageLeave')
-    expect(template).toContain('!insertmacro MUI_PAGE_DIRECTORY')
-    expect(hooks).toContain('Var PasInstallDirectory')
-    expect(hooks).toContain('Var PasInstallDirectoryInitialized')
-    expect(installPagePre).toMatch(
-      /\$PasInstallDirectoryInitialized != 1[\s\S]*StrCpy \$PasInstallDirectory "\$INSTDIR"[\s\S]*StrCpy \$PasInstallDirectoryInitialized 1/,
-    )
-    expect(installPagePre).not.toContain('$PasInstallDirectory == ""')
-    expect(hooks).toMatch(/Function PasInstallPageLeave[\s\S]*\$\{GetRoot\} "\$PasInstallDirectory" \$0/)
-    expect(hooks).toContain('StrCpy $INSTDIR "$PasInstallDirectory"')
-    expect(hooks).not.toContain('Function PasInstallPageCreate')
-    expect(hooks).not.toContain('Function PasBrowseInstall')
-    expect(hooks).toMatch(/Function PasUseDefaultData\s+Pop \$0/)
-    expect(hooks).toMatch(/Function PasUseInstallData\s+Pop \$0/)
-    expect(hooks).toMatch(/Function PasBrowseData\s+Pop \$0\s+\$\{NSD_GetText\}/)
-    expect(hooks).toContain('Var PasDataMode')
-    expect(hooks).toContain('StrCpy $PasDataMode "install"')
-    expect(hooks).toContain('StrCpy $PasDataDirectory "$INSTDIR\\data"')
-    expect(hooks).toContain('Call PasRefreshDataDirectory')
   })
 
   it('uses safe shortcut and uninstall defaults', () => {
@@ -68,6 +48,19 @@ describe('desktop installer configuration', () => {
     expect(hooks).toContain('${PAS_OWNER_FILE}')
     expect(hooks).toContain('RMDir "$6"')
     expect(hooks).not.toContain('RMDir /r "$INSTDIR"')
+  })
+
+  it('documents the portable recommendation and release version source', () => {
+    const readme = readWorkspaceFile('README.md')
+    const guide = readWorkspaceFile('docs/PixelAnchorStudio-INTERNAL-PACKAGING-GUIDE.md')
+
+    expect(readme).toContain('推荐使用便携版')
+    expect(readme).toContain('%LOCALAPPDATA%\\Programs\\PixelAnchorStudio')
+    expect(readme).not.toContain('可以修改应用安装位置')
+    expect(guide).toContain('package.json')
+    expect(guide).toContain('npm version')
+    expect(guide).toContain('git tag -a')
+    expect(guide).toContain('Draft Release')
   })
 })
 
