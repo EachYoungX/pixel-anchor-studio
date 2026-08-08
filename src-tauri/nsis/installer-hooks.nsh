@@ -10,6 +10,7 @@
 
 Var PasDataDirectory
 Var PasInstallId
+Var PasInstallDirectory
 Var PasInstallInput
 Var PasInstallBrowseButton
 Var PasDataInput
@@ -70,6 +71,11 @@ Function PasInstallPageCreate
   ${If} $PassiveMode = 1
     Abort
   ${EndIf}
+  ${If} $PasInstallDirectory == ""
+    StrCpy $PasInstallDirectory "$INSTDIR"
+  ${Else}
+    StrCpy $INSTDIR "$PasInstallDirectory"
+  ${EndIf}
   nsDialogs::Create 1018
   Pop $0
   ${If} $0 == error
@@ -78,7 +84,7 @@ Function PasInstallPageCreate
   !insertmacro MUI_HEADER_TEXT "安装位置" "选择锚点像素工作台的程序文件位置"
   ${NSD_CreateLabel} 0 0 100% 24u "安装目录可以直接输入、复制或粘贴；应用文件夹名固定为 PixelAnchorStudio。"
   Pop $0
-  ${NSD_CreateText} 0 34u 78% 13u "$INSTDIR"
+  ${NSD_CreateText} 0 34u 78% 13u "$PasInstallDirectory"
   Pop $PasInstallInput
   ${NSD_CreateButton} 80% 33u 20% 15u "浏览..."
   Pop $PasInstallBrowseButton
@@ -99,8 +105,9 @@ Function PasBrowseInstall
   ${AndIf} $0 != ""
     Push $0
     Call PasNormalizeInstallDirectory
-    Pop $INSTDIR
-    ${NSD_SetText} $PasInstallInput "$INSTDIR"
+    Pop $PasInstallDirectory
+    StrCpy $INSTDIR "$PasInstallDirectory"
+    ${NSD_SetText} $PasInstallInput "$PasInstallDirectory"
   ${EndIf}
 FunctionEnd
 
@@ -118,8 +125,9 @@ Function PasInstallPageLeave
     MessageBox MB_ICONEXCLAMATION "安装位置指向了文件，请选择或输入目录。"
     Abort
   ${EndIf}
-  StrCpy $INSTDIR $0
-  ${NSD_SetText} $PasInstallInput "$INSTDIR"
+  StrCpy $PasInstallDirectory $0
+  StrCpy $INSTDIR "$PasInstallDirectory"
+  ${NSD_SetText} $PasInstallInput "$PasInstallDirectory"
 FunctionEnd
 
 Function PasRefreshDataDirectory
