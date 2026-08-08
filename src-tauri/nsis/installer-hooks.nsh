@@ -11,6 +11,7 @@
 Var PasDataDirectory
 Var PasInstallId
 Var PasInstallDirectory
+Var PasInstallDirectoryInitialized
 Var PasDataInput
 Var PasDataBrowseButton
 Var PasDataDefaultButton
@@ -48,14 +49,24 @@ Function PasInstallPagePre
   ${If} $PassiveMode = 1
     Abort
   ${EndIf}
-  ${If} $PasInstallDirectory == ""
+  ; A native Directory page may prefill its dedicated DirVar with only the
+  ; InstallDir suffix (for example, \PixelAnchorStudio). On the first visit,
+  ; always replace that value with the fully resolved $INSTDIR. Later visits
+  ; preserve the user's selection when navigating Back / Next.
+  ${If} $PasInstallDirectoryInitialized != 1
     StrCpy $PasInstallDirectory "$INSTDIR"
+    StrCpy $PasInstallDirectoryInitialized 1
   ${EndIf}
 FunctionEnd
 
 Function PasInstallPageLeave
   ${If} $PasInstallDirectory == ""
     MessageBox MB_ICONEXCLAMATION "请选择安装位置。"
+    Abort
+  ${EndIf}
+  ${GetRoot} "$PasInstallDirectory" $0
+  ${If} $0 == ""
+    MessageBox MB_ICONEXCLAMATION "安装位置必须是包含盘符的完整路径，例如 C:\Program Files\PixelAnchorStudio。"
     Abort
   ${EndIf}
   Push $PasInstallDirectory

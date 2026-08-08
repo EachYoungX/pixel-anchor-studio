@@ -32,6 +32,7 @@ describe('desktop installer configuration', () => {
   it('uses the native directory page with dedicated install and data session state', () => {
     const template = readWorkspaceFile('src-tauri/nsis/installer.nsi')
     const hooks = readWorkspaceFile('src-tauri/nsis/installer-hooks.nsh')
+    const installPagePre = hooks.match(/Function PasInstallPagePre[\s\S]*?FunctionEnd/)?.[0] ?? ''
 
     expect(template).not.toContain('Page custom PasInstallPageCreate PasInstallPageLeave')
     expect(template).toContain('!define MUI_DIRECTORYPAGE_VARIABLE $PasInstallDirectory')
@@ -39,7 +40,12 @@ describe('desktop installer configuration', () => {
     expect(template).toContain('!define MUI_PAGE_CUSTOMFUNCTION_LEAVE PasInstallPageLeave')
     expect(template).toContain('!insertmacro MUI_PAGE_DIRECTORY')
     expect(hooks).toContain('Var PasInstallDirectory')
-    expect(hooks).toContain('StrCpy $PasInstallDirectory "$INSTDIR"')
+    expect(hooks).toContain('Var PasInstallDirectoryInitialized')
+    expect(installPagePre).toMatch(
+      /\$PasInstallDirectoryInitialized != 1[\s\S]*StrCpy \$PasInstallDirectory "\$INSTDIR"[\s\S]*StrCpy \$PasInstallDirectoryInitialized 1/,
+    )
+    expect(installPagePre).not.toContain('$PasInstallDirectory == ""')
+    expect(hooks).toMatch(/Function PasInstallPageLeave[\s\S]*\$\{GetRoot\} "\$PasInstallDirectory" \$0/)
     expect(hooks).toContain('StrCpy $INSTDIR "$PasInstallDirectory"')
     expect(hooks).not.toContain('Function PasInstallPageCreate')
     expect(hooks).not.toContain('Function PasBrowseInstall')
