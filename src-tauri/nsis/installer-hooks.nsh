@@ -95,6 +95,7 @@ Function PasInstallPageCreate
 FunctionEnd
 
 Function PasBrowseInstall
+  Pop $0
   ${NSD_GetText} $PasInstallInput $0
   Push $0
   Call PasFindExistingDirectory
@@ -189,12 +190,14 @@ Function PasDataPageCreate
 FunctionEnd
 
 Function PasUseDefaultData
+  Pop $0
   StrCpy $PasDataMode "default"
   Call PasRefreshDataDirectory
   ${NSD_SetText} $PasDataInput "$PasDataDirectory"
 FunctionEnd
 
 Function PasUseInstallData
+  Pop $0
   StrCpy $PasDataMode "install"
   Call PasRefreshDataDirectory
   ${NSD_SetText} $PasDataInput "$PasDataDirectory"
@@ -248,6 +251,7 @@ Function PasNormalizeDataRoot
 FunctionEnd
 
 Function PasBrowseData
+  Pop $0
   ${NSD_GetText} $PasDataInput $0
   Push $0
   Call PasFindExistingParent
