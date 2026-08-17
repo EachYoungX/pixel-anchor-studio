@@ -71,6 +71,10 @@ describe('desktop installer configuration', () => {
     const tauriConfig = JSON.parse(readWorkspaceFile('src-tauri/tauri.conf.json')) as { version: string }
     const cargo = readWorkspaceFile('src-tauri/Cargo.toml')
     const portableReadme = readWorkspaceFile('src-tauri/resources/README-首次运行.txt')
+    const webviewLock = JSON.parse(readWorkspaceFile('src-tauri/resources/webview2-bootstrapper.lock.json')) as {
+      url: string
+      sha256: string
+    }
     const versionSetter = readWorkspaceFile('scripts/set-version.mjs')
     const readme = readWorkspaceFile('README.md')
     const guide = readWorkspaceFile('docs/PixelAnchorStudio-INTERNAL-PACKAGING-GUIDE.md')
@@ -79,6 +83,8 @@ describe('desktop installer configuration', () => {
     expect(tauriConfig.version).toBe(packageDocument.version)
     expect(cargo).toContain(`version = "${packageDocument.version}"`)
     expect(portableReadme).toContain(`PixelAnchorStudio-${packageDocument.version}-Portable.zip`)
+    expect(new URL(webviewLock.url).hostname).toBe('go.microsoft.com')
+    expect(webviewLock.sha256).toMatch(/^[a-f0-9]{64}$/)
     expect(versionSetter).toContain("'--no-git-tag-version'")
     expect(versionSetter).toContain("'desktop:sync-version'")
     expect(versionSetter).toContain("'desktop:manifest'")
@@ -87,6 +93,7 @@ describe('desktop installer configuration', () => {
     expect(readme).not.toContain('可以修改应用安装位置')
     expect(guide).toContain('package.json')
     expect(guide).toContain('npm run version:set -- 1.0.0')
+    expect(guide).toContain('npm run desktop:webview2 -- --record-sha256')
     expect(guide).toContain('git tag -a')
     expect(guide).toContain('Draft Release')
   })

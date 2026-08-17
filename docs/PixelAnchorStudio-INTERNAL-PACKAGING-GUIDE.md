@@ -173,6 +173,20 @@ PixelAnchorStudio-<commit-sha>-windows-x64
 
 默认保留 14 天，不会自动创建 Release。
 
+### WebView2 Bootstrapper 锁更新
+
+WebView2 Evergreen Bootstrapper 的官方下载地址不变，但微软会更新该地址返回的文件。`desktop:webview2` 会用 `src-tauri/resources/webview2-bootstrapper.lock.json` 中的 SHA-256 阻止未经审核的新文件进入产物。
+
+出现 SHA-256 不匹配时，不得只为恢复构建而直接复制报错中的哈希。维护者应执行以下检查：
+
+1. 确认文件来自锁文件记录的 `https://go.microsoft.com/` 官方地址；
+2. 独立计算 SHA-256，并确认与构建日志报告的实际值一致；
+3. 在 Windows 中检查 Authenticode 状态为 `Valid`，签名主体为 `Microsoft Corporation`；
+4. 审核通过后运行 `npm run desktop:webview2 -- --record-sha256` 更新锁；
+5. 检查锁文件差异，再运行 `npm run desktop:webview2` 验证普通校验路径。
+
+锁更新应形成独立提交，并重新运行 Desktop Build。
+
 ---
 
 ## 五、Desktop Build 适用范围
@@ -271,8 +285,8 @@ Get-Content .\SHA256SUMS.txt
 
 ### 1. 准备最终版本提交
 
-1. 用 `npm version <version> --no-git-tag-version` 设置正式版本；
-2. 同步桌面版本并更新 CHANGELOG、README 和 Release Notes；
+1. 用 `npm run version:set -- <version>` 设置并同步正式版本；
+2. 更新 CHANGELOG、README 和 Release Notes；
 3. 运行本地检查；
 4. Commit、Push；
 5. 等待该提交 CI 全绿；
