@@ -62,7 +62,7 @@ PixelAnchorStudio-<version>-Setup.exe
 
 ### 版本源
 
-根目录 [`package.json`](../package.json) 的 `version` 是发布版本号的人工源头。
+根目录 [`package.json`](../package.json) 的 `version` 是发布版本号的唯一源头。版本应通过统一命令更新，不直接手工编辑版本文件。
 
 以下产物名称都直接读取它：
 
@@ -74,38 +74,35 @@ PixelAnchorStudio-<version>-Setup.exe
 ```text
 src-tauri/tauri.conf.json
 src-tauri/Cargo.toml
+src-tauri/resources/README-首次运行.txt 中的便携版校验示例
 ```
 
 `desktop:build`、`desktop:portable` 和 `desktop:installer` 都会调用同步脚本。因此不需要每次手工修改多个桌面配置文件。
 
 ### 版本更新步骤
 
-在干净工作区中只执行一次：
+在干净工作区中执行：
 
 ```bash
-npm version 1.0.0 --no-git-tag-version
-npm run desktop:sync-version
-cargo check --manifest-path src-tauri/Cargo.toml
+npm run version:set -- 1.0.0
 ```
 
-第一条命令同时修改：
+将 `1.0.0` 替换为目标版本，无需打开或修改脚本。命令会依次执行以下操作：
 
-```text
-package.json
-package-lock.json
-```
-
-第二条命令同步 Tauri 和 Cargo 包版本；第三条命令校验 Rust 工程并让 `Cargo.lock` 与包版本保持一致。
+1. 通过 `npm version <version> --no-git-tag-version` 更新 `package.json` 和 `package-lock.json`，不创建提交或 Tag；
+2. 同步 `src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml` 和便携版校验示例；
+3. 重新生成安装清单；
+4. 运行 `cargo check` 校验 Rust 工程并让 `Cargo.lock` 与包版本保持一致。
 
 然后检查实际变更：
 
 ```bash
-git diff -- package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock
+git diff -- package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/resources/README-首次运行.txt
 ```
 
 Setup、Portable 文件名和 `tauri.conf.json` 不应作为独立版本源；后续脚本运行始终以 `package.json` 为准。
 
-版本提交还应同时更新：
+统一命令只处理可以机械同步的版本元数据。版本提交还应人工更新：
 
 ```text
 CHANGELOG.md

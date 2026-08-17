@@ -1,6 +1,9 @@
 import { expect, test, type Download, type Page } from '@playwright/test'
+import { readFileSync } from 'node:fs'
 import { deflateSync } from 'node:zlib'
 import { QUICK_START_SEEN_KEY } from '../../src/core/onboarding'
+
+const PACKAGE_VERSION = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).version as string
 
 function crc32(bytes: Uint8Array): number {
   let crc = 0xffffffff
@@ -604,9 +607,9 @@ test('shows quick start once and reopens release notes and license from the titl
   await expect(dialog.getByRole('heading', { name: '快速开始' })).toBeVisible()
 
   await dialog.getByRole('button', { name: '更新日志' }).click()
-  await expect(dialog.getByText(/v0\.5\.1/)).toBeVisible()
-  await expect(dialog.getByRole('heading', { name: '桌面安装' })).toBeVisible()
-  await expect(dialog.getByRole('heading', { name: '文件操作' })).toBeVisible()
+  await expect(dialog.getByText(`v${PACKAGE_VERSION}`)).toBeVisible()
+  await expect(dialog.getByRole('heading', { name: '正式版本' })).toBeVisible()
+  await expect(dialog.getByRole('heading', { name: 'Windows 桌面版' })).toBeVisible()
 
   await dialog.getByRole('button', { name: '项目与许可' }).click()
   await expect(dialog.getByRole('heading', { name: '项目声明' })).toBeVisible()

@@ -1,7 +1,7 @@
 {
   "name": "pixel-anchor-studio",
   "private": true,
-  "version": "0.5.1",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "test:bench": "vitest bench",
     "test:e2e": "playwright test",
+    "version:set": "node scripts/set-version.mjs",
     "desktop:dev": "npm run desktop:sync-version && tauri dev",
     "desktop:build": "npm run desktop:sync-version && tauri build --no-bundle",
     "desktop:portable": "npm run desktop:build && node scripts/build-portable.mjs",

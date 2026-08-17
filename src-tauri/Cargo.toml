@@ -1,6 +1,6 @@
 [package]
 name = "pixel-anchor-studio"
-version = "0.5.1"
+version = "1.0.0"
 description = "锚点像素工作台 Windows desktop shell"
 authors = ["EachYoung"]
 license = "MIT"

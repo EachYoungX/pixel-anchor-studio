@@ -67,14 +67,26 @@ describe('desktop installer configuration', () => {
   })
 
   it('documents the portable recommendation and release version source', () => {
+    const packageDocument = JSON.parse(readWorkspaceFile('package.json')) as { version: string; scripts: Record<string, string> }
+    const tauriConfig = JSON.parse(readWorkspaceFile('src-tauri/tauri.conf.json')) as { version: string }
+    const cargo = readWorkspaceFile('src-tauri/Cargo.toml')
+    const portableReadme = readWorkspaceFile('src-tauri/resources/README-首次运行.txt')
+    const versionSetter = readWorkspaceFile('scripts/set-version.mjs')
     const readme = readWorkspaceFile('README.md')
     const guide = readWorkspaceFile('docs/PixelAnchorStudio-INTERNAL-PACKAGING-GUIDE.md')
 
+    expect(packageDocument.scripts['version:set']).toBe('node scripts/set-version.mjs')
+    expect(tauriConfig.version).toBe(packageDocument.version)
+    expect(cargo).toContain(`version = "${packageDocument.version}"`)
+    expect(portableReadme).toContain(`PixelAnchorStudio-${packageDocument.version}-Portable.zip`)
+    expect(versionSetter).toContain("'--no-git-tag-version'")
+    expect(versionSetter).toContain("'desktop:sync-version'")
+    expect(versionSetter).toContain("'desktop:manifest'")
     expect(readme).toContain('推荐使用便携版')
     expect(readme).toContain('%LOCALAPPDATA%\\Programs\\PixelAnchorStudio')
     expect(readme).not.toContain('可以修改应用安装位置')
     expect(guide).toContain('package.json')
-    expect(guide).toContain('npm version')
+    expect(guide).toContain('npm run version:set -- 1.0.0')
     expect(guide).toContain('git tag -a')
     expect(guide).toContain('Draft Release')
   })
